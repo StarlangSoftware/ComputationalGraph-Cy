@@ -20,9 +20,7 @@ class ComputationalGraph:
     def addEdge(self, first, second):
         """
         Adds an edge to the computational graph.
-        :param first: Parent node.
         :param second: Child node (ComputationalNode) or function type (e.g., 'SIGMOID').
-        :param debug: Whether to print debug information.
         :return: The newly created or linked computational node.
         """
         if isinstance(second, FunctionType):  # FunctionType case
@@ -80,7 +78,7 @@ class ComputationalGraph:
         for node in self.node_map:
             if node not in visited:
                 queue = self.sort(node, visited)
-                while(queue):
+                while (queue):
                     sorted_list.append(queue.popleft())
         return list(sorted_list) 
     

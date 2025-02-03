@@ -1,5 +1,7 @@
-import numpy as np
 from abc import ABC, abstractmethod
+
+from Math.Matrix import Matrix
+
 
 class Function(ABC):
     """
@@ -7,7 +9,7 @@ class Function(ABC):
     """
 
     @abstractmethod
-    def calculate(self, matrix: np.ndarray) -> np.ndarray:
+    def calculate(self, matrix: Matrix) -> Matrix:
         """
         Computes the function output for the given matrix.
         :param matrix: NumPy array representing input values.
@@ -16,7 +18,7 @@ class Function(ABC):
         pass
 
     @abstractmethod
-    def derivative(self, matrix: np.ndarray) -> np.ndarray:
+    def derivative(self, matrix: Matrix) -> Matrix:
         """
         Computes the derivative of the function.
         :param matrix: NumPy array representing function output.

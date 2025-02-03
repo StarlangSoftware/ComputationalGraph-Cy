@@ -1,6 +1,3 @@
-import numpy as np
-import math
-
 from ComputationalGraph.Function import Function
 from Math.Matrix import Matrix
 
