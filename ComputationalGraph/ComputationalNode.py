@@ -1,11 +1,18 @@
 from collections import defaultdict, deque
 from Math.Matrix import Matrix
+from ComputationalGraph.FunctionType import FunctionType
 
 class ComputationalNode:
-    def __init__(self, learnable=False, operator=None, function_type=None, value=None):
+    def __init__(self, 
+                learnable: bool=True, 
+                isBiased: bool=False, 
+                operator: str=None, 
+                function_type: FunctionType=None, 
+                value: Matrix=None):
         """
         Initializes a ComputationalNode.
         :param learnable: Indicates whether the node is learnable (e.g., weights).
+        :param learnable: Indicates whether the node is biased (e.g., weights).
         :param function_type: Type of function (e.g., activation like SIGMOID).
         :param operator: Operator (e.g., '*', '+') for the node.
         :param value: The matrix value associated with the node (optional).
@@ -13,6 +20,7 @@ class ComputationalNode:
         self.value = value
         self.backward = None
         self.learnable = learnable
+        self.is_biased = isBiased
         self.operator = operator
         self.function_type = function_type
 
@@ -25,10 +33,17 @@ class ComputationalNode:
         if self.value:
             details.append(f"Value Shape: ({self.value.getRow()}, {self.value.getColumn()})")
         details.append(f"is learnable: {self.learnable}")
+        details.append(f"is biased: {self.is_biased}")
         return f"Node({', '.join(details)})"
 
     def __repr__(self):
         return self.__str__()
+
+    def isBiased(self):
+        """
+        Returns whether the node is biased.
+        """
+        return self.is_biased
 
     def getFunctionType(self):
         """

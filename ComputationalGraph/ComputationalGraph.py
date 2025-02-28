@@ -1,5 +1,6 @@
 from Math.Matrix import Matrix 
 
+from typing import List, Set, Optional, Union
 from collections import defaultdict, deque
 from ComputationalGraph.ComputationalNode import ComputationalNode 
 from ComputationalGraph.Softmax import Softmax
@@ -17,15 +18,20 @@ class ComputationalGraph:
         self.node_map = defaultdict(list)
         self.reverse_node_map = defaultdict(list)
 
-    def addEdge(self, first, second):
+    def addEdge(self, 
+                first: ComputationalNode, 
+                second: Optional[Union[ComputationalNode, FunctionType]] = None, 
+                isBiased: bool = False) -> ComputationalNode:
         """
         Adds an edge to the computational graph.
-        :param second: Child node (ComputationalNode) or function type (e.g., 'SIGMOID').
+        :param 
+        second_node: Child node (ComputationalNode) .
+        second_function: FunctionType (e.g., 'SIGMOID').
+        isBiased: Boolean
         :return: The newly created or linked computational node.
         """
         if isinstance(second, FunctionType):  # FunctionType case
-            new_node = ComputationalNode(learnable=False, function_type=second)
-
+            new_node = ComputationalNode(learnable=False, function_type=second, isBiased=isBiased)
             if first not in self.node_map.keys():
                 self.node_map[first] = []
             self.node_map[first].append(new_node)
@@ -35,7 +41,7 @@ class ComputationalGraph:
             return new_node
         
         elif isinstance(second, ComputationalNode):  # ComputationalNode case
-            new_node = ComputationalNode(learnable=False, operator=second.getOperator())
+            new_node = ComputationalNode(learnable=False, operator=second.getOperator(), isBiased=isBiased)
             if first not in self.node_map.keys():
                 self.node_map[first] = []
             if second not in self.node_map.keys():
@@ -50,12 +56,11 @@ class ComputationalGraph:
         else:
             raise ValueError("Invalid type for second_or_function. Must be a ComputationalNode or FunctionType.")
 
-    def sort(self, node, visited):
+    def sort(self, node: ComputationalNode, visited: Set[ComputationalNode]) -> List[ComputationalNode]:
         """
         Recursive helper function to perform depth-first search for topological sorting.
         :param node: The current node being processed.
         :param visited: A set of visited nodes.
-        :param node_map: A dictionary representing the graph (node -> list of child nodes).
         :return: A list representing the partial topological order.
         """
         queue = deque()
@@ -67,7 +72,7 @@ class ComputationalGraph:
         queue.append(node)  
         return queue
 
-    def topologicalSort(self):
+    def topologicalSort(self) -> List[ComputationalNode]:
         """
         Performs topological sorting on the computational graph.
         :param node_map: A dictionary representing the graph (node -> list of child nodes).
@@ -82,7 +87,7 @@ class ComputationalGraph:
                     sorted_list.append(queue.popleft())
         return list(sorted_list) 
     
-    def clearRecursive(self, visited, node):
+    def clearRecursive(self, visited: Set[ComputationalNode], node: ComputationalNode) -> None:
         """
         Recursive helper function to clear the values and gradients of nodes.
         """
@@ -96,7 +101,7 @@ class ComputationalGraph:
                 if child not in visited:
                     self.clearRecursive(visited, child)
 
-    def clear(self):
+    def clear(self) -> None:
         """
         Clears the values and gradients of all nodes in the graph.
         """
@@ -105,7 +110,7 @@ class ComputationalGraph:
             if node not in visited:
                 self.clearRecursive(visited, node)
 
-    def updateRecursive(self, visited, node):
+    def updateRecursive(self, visited: Set[ComputationalNode], node: ComputationalNode) -> None:
         """
         Recursive helper function to update the values of learnable nodes.
         """
@@ -118,7 +123,7 @@ class ComputationalGraph:
                 if child not in visited:
                     self.updateRecursive(visited, child)
 
-    def updateValues(self):
+    def updateValues(self) -> None:
         """
         Updates the values of all learnable nodes in the graph.
         """
@@ -127,7 +132,7 @@ class ComputationalGraph:
             if node not in visited:
                 self.updateRecursive(visited, node)
     
-    def calculateDerivative(self, node, child):
+    def calculateDerivative(self, node: ComputationalNode, child: ComputationalNode) -> Matrix:
         """
         Calculates the derivative of the child node with respect to the parent node.
         :param node: Parent node.
@@ -153,7 +158,7 @@ class ComputationalGraph:
             right = self.reverse_node_map.get(child)[1]
             if child.getOperator() == '*':
                 if left == node:
-                    if len(self.node_map.get(child)) == 1 and self.node_map.get(child)[0] not in self.node_map.keys():
+                    if child.isBiased() == False:
                         return child.getBackward().multiply(right.getValue().transpose())
                     return child.getBackward().partial(0, child.getBackward().getRow()-1, 0, child.getBackward().getColumn() - 2).multiply(right.getValue().transpose())
                 return left.getValue().transpose().multiply(child.getBackward())
@@ -165,10 +170,14 @@ class ComputationalGraph:
                 if left == node:
                     return child.getBackward().clone()
                 else:
-                    return child.getBackward().integer_multiply(-1)
+                    result = child.getBackward().clone()
+                    for i in range(result.getRow()):
+                        for j in range(result.getColumn()):
+                            result.setValue(i, j, -result.getValue(i, j))
+                    return result
         return None
 
-    def calculateRMinusY(self, output, learning_rate, class_label_index):
+    def calculateRMinusY(self, output: ComputationalNode, learning_rate: float, class_label_index: List[int]) -> None:
         """
         Computes the difference between the predicted and actual values (R - Y).
         :param output: The output node of the computational graph.
@@ -185,7 +194,7 @@ class ComputationalGraph:
                     backward.setValue(i, j, (-output.getValue().getValue(i, j)) * learning_rate)
         output.setBackward(backward)
 
-    def backpropagation(self, learning_rate, class_label_index):
+    def backpropagation(self, learning_rate: float, class_label_index: List[int]) -> None:
         """
         Performs backpropagation on the computational graph.
         :param learning_rate: The learning rate for gradient descent.
@@ -195,7 +204,7 @@ class ComputationalGraph:
         output_node = sorted_nodes.pop(0)  
         self.calculateRMinusY(output_node, learning_rate, class_label_index)
         sorted_nodes.pop(0).setBackward(output_node.getBackward().clone())
-        while sorted_nodes:
+        while len(sorted_nodes) != 0:
             node = sorted_nodes.pop(0)  
             for child in self.node_map.get(node):
                 if node.getBackward() is None:
@@ -205,7 +214,7 @@ class ComputationalGraph:
         self.updateValues()
         self.clear()
 
-    def getBiased(self, first):
+    def getBiased(self, first: ComputationalNode) -> None:
         """
         Add a bias term to the node's value by appending a column of ones.
         """
@@ -216,7 +225,7 @@ class ComputationalGraph:
             biased_value.setValue(i, first.getValue().getColumn(), 1.0)
         first.setValue(biased_value)
 
-    def predict(self):
+    def predict(self) -> List[int]:
         """
         Perform a forward pass and return predicted class indices.
         """
@@ -224,7 +233,7 @@ class ComputationalGraph:
         self.clear()
         return class_labels
 
-    def forwardCalculation(self):
+    def forwardCalculation(self) -> List[int]:
         """
         Perform a forward pass through the computational graph.
         Returns:
@@ -236,8 +245,8 @@ class ComputationalGraph:
         while len(sorted_nodes) != 1:
             current_node = sorted_nodes.pop()
             for child in self.node_map.get(current_node):
-                if child.getValue() is None:
-                    if child.getFunctionType() is not None: 
+                if child.getValue() == None:
+                    if child.getFunctionType() != None: 
                         function = None
                         if child.getFunctionType() == FunctionType.SIGMOID:
                             function = Sigmoid()
@@ -249,15 +258,15 @@ class ComputationalGraph:
                             function = Softmax()
                         else:
                             raise ValueError(f"Unsupported function type: {child.function_type}")
-                        child.value = function.calculate(current_node.value)
+                        child.setValue(function.calculate(current_node.getValue()))
                     else:
-                        if (child.getOperator() == '*') and (not current_node.isLearnable()):
+                        if current_node.isBiased():
                             self.getBiased(current_node)
                         child.setValue(current_node.getValue().clone())
                 else:
                     if child.getFunctionType() == None:
                         if child.getOperator() == '*':
-                            if not current_node.isLearnable():
+                            if current_node.isBiased():
                                 self.getBiased(current_node)
                             if child.getValue().getColumn() == current_node.getValue().getRow():
                                 child.setValue(child.getValue().multiply(current_node.getValue()))

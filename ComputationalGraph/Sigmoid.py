@@ -18,7 +18,7 @@ class Sigmoid(Function):
         result = Matrix(matrix.getRow(), matrix.getColumn())
         for i in range(matrix.getRow()):
             for j in range(matrix.getColumn()):
-                result.setValue(i, j, 1 / (1 + math.exp(matrix.getValue(i, j))))
+                result.setValue(i, j, 1 / (1 + math.exp(-matrix.getValue(i, j))))
         return result
 
     def derivative(self, matrix):
