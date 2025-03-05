@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from Math.Matrix import Matrix
+from Math.Tensor import Tensor
 
 
 class Function(ABC):
@@ -9,19 +9,19 @@ class Function(ABC):
     """
 
     @abstractmethod
-    def calculate(self, matrix: Matrix) -> Matrix:
+    def calculate(self, tensor: Tensor) -> Tensor:
         """
-        Computes the function output for the given matrix.
-        :param matrix: NumPy array representing input values.
+        Computes the function output for the given tensor.
+        :param tensor: NumPy array representing input values.
         :return: Transformed NumPy array.
         """
         pass
 
     @abstractmethod
-    def derivative(self, matrix: Matrix) -> Matrix:
+    def derivative(self, tensor: Tensor) -> Tensor:
         """
         Computes the derivative of the function.
-        :param matrix: NumPy array representing function output.
+        :param tensor: NumPy array representing function output.
         :return: Derivative of the function.
         """
         pass

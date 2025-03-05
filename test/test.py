@@ -3,7 +3,7 @@ import unittest
 import random
 
 from typing import List
-from Math.Matrix import Matrix
+from Math.Tensor import Tensor
 from ComputationalGraph.ComputationalGraph import ComputationalGraph
 from ComputationalGraph.ComputationalNode import ComputationalNode
 from ComputationalGraph.FunctionType import FunctionType
@@ -12,14 +12,11 @@ from ComputationalGraph.FunctionType import FunctionType
 random.seed(10)
 
 class TestComputationalGraph(unittest.TestCase):
-    def create_input_matrix(self, instance: List[str]) -> Matrix:
+    def create_input_tensor(self, instance: List[str]) -> Tensor:
         """
-        Converts an instance (excluding label) into a NumPy matrix.
+        Converts an instance (excluding label) into a NumPy Tensor.
         """
-        matrix = Matrix(1, len(instance) -1)
-        for i in range(len(instance) -1 ):
-            matrix.setValue(0, i, float(instance[i]))
-        return matrix
+        return Tensor([[float(item) for item in instance[:-1]]])
 
     def test_iris_dataset(self):
         """
@@ -46,38 +43,41 @@ class TestComputationalGraph(unittest.TestCase):
 
         graph = ComputationalGraph()
         input_node = ComputationalNode(learnable=False, operator="*", isBiased=True)
-
-        w1 = ComputationalNode(value=Matrix(5, 4, -0.01, 0.01, seed=1), operator="*")
+        
+        m1 = Tensor([[random.uniform(-0.01, 0.01) for _c in range(4)] for _r in range(5)])
+        w1 = ComputationalNode(value=m1, operator="*")
         a1 = graph.addEdge(first=input_node, second=w1, isBiased=True)
         a1_sigmoid = graph.addEdge(first=a1, second=FunctionType.SIGMOID, isBiased=True)
 
-        w2 = ComputationalNode(value=Matrix(5, 20, -0.01, 0.01, seed=2), operator="*")
+        m2 = Tensor([[random.uniform(-0.01, 0.01) for _c in range(20)] for _r in range(5)])
+        w2 = ComputationalNode(value=m2, operator="*")
         a2 = graph.addEdge(first=a1_sigmoid, second=w2, isBiased=True)
         a2_sigmoid = graph.addEdge(first=a2, second=FunctionType.SIGMOID, isBiased=True)
 
-        w3 = ComputationalNode(value=Matrix(21, len(label_map), -0.01, 0.01, seed=3), operator="*")
+        m3 = Tensor([[random.uniform(-0.01, 0.01) for _c in range(len(label_map))] for _r in range(21)])
+        w3 = ComputationalNode(value=m3, operator="*")
         a3 = graph.addEdge(first=a2_sigmoid, second=w3, isBiased=False)
         graph.addEdge(first=a3, second=FunctionType.SOFTMAX, isBiased=False)
-
+        
         # Training loop
-        epochs = 500
-        learning_rate = 0.05
+        epochs = 5
+        learning_rate = 0.1
         etaDecrease = 0.99
         class_list = []
         for _ in range(epochs):
             random.shuffle(instances)
             for instance in instances:
-                input_node.setValue(self.create_input_matrix(instance))
+                input_node.setValue(self.create_input_tensor(instance))
                 graph.forwardCalculation()
                 class_list = [label_map[instance[-1]]]
                 graph.backpropagation(learning_rate, class_list)
                 
             learning_rate *= etaDecrease
-
+        
         # Evaluate on test set
         correct = 0
         for instance in test_set:
-            input_node.setValue(self.create_input_matrix(instance))
+            input_node.setValue(self.create_input_tensor(instance))
             class_label = graph.predict()[0]
             if class_label == label_map[instance[-1]]:
                 correct += 1
@@ -99,8 +99,8 @@ class TestComputationalGraph(unittest.TestCase):
         output = graph.addEdge(first=a2, second=FunctionType.SOFTMAX, isBiased=False)
 
         # Assign values
-        a0.setValue(Matrix(1, 3, 0, 100, seed=1))
-        a1.setValue(Matrix(1, 3, 0, 100, seed=1))
+        a0.setValue(Tensor([[random.uniform(0, 100) for _ in range(3)] for _ in range(1)]))
+        a1.setValue(Tensor([[random.uniform(0, 100) for _ in range(3)] for _ in range(1)]))
 
         # Perform forward and backward propagation
         graph.forwardCalculation()

@@ -1,7 +1,7 @@
-from Math.Matrix import Matrix 
-
 from typing import List, Set, Optional, Union
 from collections import defaultdict, deque
+
+from Math.Tensor import Tensor 
 from ComputationalGraph.ComputationalNode import ComputationalNode 
 from ComputationalGraph.Softmax import Softmax
 from ComputationalGraph.Sigmoid import Sigmoid
@@ -132,12 +132,12 @@ class ComputationalGraph:
             if node not in visited:
                 self.updateRecursive(visited, node)
     
-    def calculateDerivative(self, node: ComputationalNode, child: ComputationalNode) -> Matrix:
+    def calculateDerivative(self, node: ComputationalNode, child: ComputationalNode) -> Tensor:
         """
         Calculates the derivative of the child node with respect to the parent node.
         :param node: Parent node.
         :param child: Child node.
-        :return: The gradient matrix.
+        :return: The gradient tensor.
         """
         left = self.reverse_node_map.get(child)[0]
         if len(self.reverse_node_map.get(child)) == 1:
@@ -152,28 +152,28 @@ class ComputationalGraph:
                 function = Softmax()
             else:
                 raise ValueError(f"Unsupported function type: {child.getFunctionType()}")
-            return child.getBackward().elementProduct(function.derivative(child.getValue()))
+            return child.getBackward().__mul__(function.derivative(child.getValue()))
 
         else:
             right = self.reverse_node_map.get(child)[1]
             if child.getOperator() == '*':
                 if left == node:
                     if child.isBiased() == False:
-                        return child.getBackward().multiply(right.getValue().transpose())
-                    return child.getBackward().partial(0, child.getBackward().getRow()-1, 0, child.getBackward().getColumn() - 2).multiply(right.getValue().transpose())
-                return left.getValue().transpose().multiply(child.getBackward())
+                        return child.getBackward().dot(right.getValue().transpose())
+                    return child.getBackward().partial([0, 0], [child.getBackward().shape[0] ,child.getBackward().shape[1] - 1]).dot(right.getValue().transpose())
+                return left.getValue().transpose().dot(child.getBackward())
 
             elif child.getOperator() == '+':
-                return child.getBackward().clone()
+                return child.getBackward()
 
             elif child.getOperator() == '-':
                 if left == node:
-                    return child.getBackward().clone()
+                    return child.getBackward()
                 else:
-                    result = child.getBackward().clone()
-                    for i in range(result.getRow()):
-                        for j in range(result.getColumn()):
-                            result.setValue(i, j, -result.getValue(i, j))
+                    result = child.getBackward()
+                    for i in range(result.shape[0]):
+                        for j in range(result.shape[1]):
+                            result.set([i, j], -result.get([i, j]))
                     return result
         return None
 
@@ -184,14 +184,14 @@ class ComputationalGraph:
         :param learning_rate: The learning rate for gradient descent.
         :param class_label_index: A list of true class labels (index of the correct class for each sample).
         """
-        rows, cols = output.getValue().getRow(), output.getValue().getColumn()
-        backward = Matrix(rows, cols)
+        rows, cols = output.getValue().shape[1], output.getValue().shape[0]
+        backward = Tensor([[0 for _c in range(cols)] for _r in range(rows)])
         for i in range(rows):
             for j in range(cols):
                 if class_label_index[i] == j:
-                    backward.setValue(i, j, (1 - output.getValue().getValue(i, j)) * learning_rate)
+                    backward.set([i, j], (1 - output.getValue().get([i, j])) * learning_rate)
                 else:
-                    backward.setValue(i, j, (-output.getValue().getValue(i, j)) * learning_rate)
+                    backward.set([i, j], (-output.getValue().get([i, j])) * learning_rate)
         output.setBackward(backward)
 
     def backpropagation(self, learning_rate: float, class_label_index: List[int]) -> None:
@@ -203,14 +203,14 @@ class ComputationalGraph:
         sorted_nodes = self.topologicalSort()
         output_node = sorted_nodes.pop(0)  
         self.calculateRMinusY(output_node, learning_rate, class_label_index)
-        sorted_nodes.pop(0).setBackward(output_node.getBackward().clone())
+        sorted_nodes.pop(0).setBackward(output_node.getBackward())
         while len(sorted_nodes) != 0:
             node = sorted_nodes.pop(0)  
             for child in self.node_map.get(node):
                 if node.getBackward() is None:
                     node.setBackward(self.calculateDerivative(node, child))
                 else:
-                    node.getBackward().add(self.calculateDerivative(node, child))
+                    node.getBackward().__add__(self.calculateDerivative(node, child))
         self.updateValues()
         self.clear()
 
@@ -218,11 +218,11 @@ class ComputationalGraph:
         """
         Add a bias term to the node's value by appending a column of ones.
         """
-        biased_value = Matrix(first.getValue().getRow(), first.getValue().getColumn() + 1)
-        for i in range(first.getValue().getRow()):
-            for j in range(first.getValue().getColumn()):
-                biased_value.setValue(i, j, first.getValue().getValue(i, j))
-            biased_value.setValue(i, first.getValue().getColumn(), 1.0)
+        biased_value = Tensor([[0 for _c in range(first.getValue().shape[1] + 1 )] for _r in range(first.getValue().shape[0])])
+        for i in range(first.getValue().shape[0]):
+            for j in range(first.getValue().shape[1]):
+                biased_value.set([i, j], first.getValue().get([i, j]))
+            biased_value.set([i, first.getValue().shape[1]], 1.0)
         first.setValue(biased_value)
 
     def predict(self) -> List[int]:
@@ -262,34 +262,34 @@ class ComputationalGraph:
                     else:
                         if current_node.isBiased():
                             self.getBiased(current_node)
-                        child.setValue(current_node.getValue().clone())
+                        child.setValue(current_node.getValue())
                 else:
                     if child.getFunctionType() == None:
                         if child.getOperator() == '*':
                             if current_node.isBiased():
                                 self.getBiased(current_node)
-                            if child.getValue().getColumn() == current_node.getValue().getRow():
-                                child.setValue(child.getValue().multiply(current_node.getValue()))
+                            if child.getValue().shape[1] == current_node.getValue().shape[0]:
+                                child.setValue(child.getValue().dot(current_node.getValue()))
                             else:
-                                child.setValue(current_node.getValue().multiply(child.getValue()))
+                                child.setValue(current_node.getValue().dot(child.getValue()))
                         elif child.getOperator() == '+':
-                            result = child.getValue().clone()
-                            result.add(current_node.getValue())
+                            result = child.getValue()
+                            result.__add__(current_node.getValue())
                             child.setValue(result)
                         elif child.operator == '-':
                             result = child.getValue().clone()
-                            result.subtract(current_node.getValue())
+                            result.__sub__(current_node.getValue())
                             child.setValue(result)
                         else:
                             raise ValueError(f"Unsupported operator: {child.getOperator()}")
 
         class_label_indices = []
-        for i in range(output_node.getValue().getRow()):
+        for i in range(output_node.getValue().shape[0]):
             max_val = float('-inf')
             label_index = -1
-            for j in range(output_node.getValue().getColumn()):
-                if (max_val < output_node.getValue().getValue(i, j)):
-                    max_val = output_node.getValue().getValue(i, j)
+            for j in range(output_node.getValue().shape[1]):
+                if (max_val < output_node.getValue().get([i, j])):
+                    max_val = output_node.getValue().get([i, j])
                     label_index = j
             class_label_indices.append(label_index)
 

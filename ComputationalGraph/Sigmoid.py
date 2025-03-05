@@ -1,7 +1,7 @@
 import math
 
 from ComputationalGraph.Function import Function
-from Math.Matrix import Matrix
+from Math.Tensor import Tensor
 
 
 class Sigmoid(Function):
@@ -9,26 +9,26 @@ class Sigmoid(Function):
     Implements the Sigmoid activation function.
     """
 
-    def calculate(self, matrix):
+    def calculate(self, tensor):
         """
-        Computes the Sigmoid activation for the given matrix.
-        :param matrix: NumPy array representing input values.
+        Computes the Sigmoid activation for the given tensor.
+        :param tensor: NumPy array representing input values.
         :return: Sigmoid-transformed NumPy array.
         """
-        result = Matrix(matrix.getRow(), matrix.getColumn())
-        for i in range(matrix.getRow()):
-            for j in range(matrix.getColumn()):
-                result.setValue(i, j, 1 / (1 + math.exp(-matrix.getValue(i, j))))
+        result = Tensor([[0 for _r in range(tensor.shape[1]) ] for _c in range(tensor.shape[0])])
+        for i in range(tensor.shape[0]):
+            for j in range(tensor.shape[1]):
+                result.set([i, j], 1 / (1 + math.exp(-tensor.get([i, j]))))
         return result
 
-    def derivative(self, matrix):
+    def derivative(self, tensor):
         """
         Computes the derivative of the Sigmoid function.
-        :param matrix: NumPy array representing Sigmoid output.
+        :param tensor: NumPy array representing Sigmoid output.
         :return: Derivative of the Sigmoid function.
         """
-        result = Matrix(matrix.getRow(), matrix.getColumn())
-        for i in range(matrix.getRow()):
-            for j in range(matrix.getColumn()):
-                result.setValue(i, j, matrix.getValue(i, j) * (1 - matrix.getValue(i, j)))
+        result = Tensor([[0 for _r in range(tensor.shape[1]) ] for _c in range(tensor.shape[0])])
+        for i in range(tensor.shape[0]):
+            for j in range(tensor.shape[1]):
+                result.set([i, j], tensor.get([i, j]) * (1 - tensor.get([i, j])))
         return result

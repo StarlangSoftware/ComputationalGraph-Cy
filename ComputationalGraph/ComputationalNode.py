@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from Math.Matrix import Matrix
+from Math.Tensor import Tensor
 from ComputationalGraph.FunctionType import FunctionType
 
 class ComputationalNode:
@@ -8,14 +8,14 @@ class ComputationalNode:
                 isBiased: bool=False, 
                 operator: str=None, 
                 function_type: FunctionType=None, 
-                value: Matrix=None):
+                value: Tensor=None):
         """
         Initializes a ComputationalNode.
         :param learnable: Indicates whether the node is learnable (e.g., weights).
         :param learnable: Indicates whether the node is biased (e.g., weights).
         :param function_type: Type of function (e.g., activation like SIGMOID).
         :param operator: Operator (e.g., '*', '+') for the node.
-        :param value: The matrix value associated with the node (optional).
+        :param value: The tensor value associated with the node (optional).
         """
         self.value = value
         self.backward = None
@@ -31,7 +31,7 @@ class ComputationalNode:
         if self.operator:
             details.append(f"Operator: {self.operator}")
         if self.value:
-            details.append(f"Value Shape: ({self.value.getRow()}, {self.value.getColumn()})")
+            details.append(f"Value Shape: {self.value.shape}")
         details.append(f"is learnable: {self.learnable}")
         details.append(f"is biased: {self.is_biased}")
         return f"Node({', '.join(details)})"
@@ -66,7 +66,7 @@ class ComputationalNode:
     def setValue(self, value):
         """
         Sets the value of the node.
-        :param value: The new value (Matrix object).
+        :param value: The new value (Tensor object).
         """
         self.value = value
 
@@ -75,9 +75,9 @@ class ComputationalNode:
         Update the values.
         """
         if self.value is not None and self.backward is not None:
-            for i in range(self.value.getRow()): 
-                for j in range(self.value.getColumn()):
-                    self.value.setValue(i, j, self.value.getValue(i, j) + self.backward.getValue(i, j))
+            for i in range(self.value.shape[0]): 
+                for j in range(self.value.shape[1]):
+                    self.value.set([i, j], self.value.get([i, j]) + self.backward.get([i, j]))
 
     def isLearnable(self):
         """
@@ -94,7 +94,7 @@ class ComputationalNode:
     def setBackward(self, backward):
         """
         Sets the backward gradient of the node.
-        :param backward: The gradient matrix (Matrix object).
+        :param backward: The gradient tensor (Tensor object).
         """
         self.backward = backward
 
