@@ -3,35 +3,26 @@ from Math.Tensor import Tensor
 
 class ReLU(Function):
     """
-    Implements the Sigmoid activation function.
+    Implements the ReLU activation function.
     """
 
-    def calculate(self, tensor):
+    def calculate(self, tensor: Tensor) -> Tensor:
         """
-        Computes the Sigmoid activation for the given tensor.
-        :param tensor: NumPy array representing input values.
-        :return: Sigmoid-transformed NumPy array.
+        Computes the ReLU activation for the given tensor.
         """
-        result = Tensor([[0 for _r in range(tensor.shape[1]) ] for _c in range(tensor.shape[0])])
+        result = Tensor([[0 for _ in range(tensor.shape[1])] for _ in range(tensor.shape[0])], tensor.shape)
         for i in range(tensor.shape[0]):
             for j in range(tensor.shape[1]):
-                if tensor.get([i, j]) > 0:
-                    result.set([i, j], tensor.get([i, j]))
-                else:
-                    result.set([i, j], 0)
+                val = tensor.get((i, j))
+                result.set((i, j), max(0, val))  # Optimized calculation
         return result
 
-    def derivative(self, tensor):
+    def derivative(self, tensor: Tensor) -> Tensor:
         """
-        Computes the derivative of the Sigmoid function.
-        :param tensor: NumPy array representing Sigmoid output.
-        :return: Derivative of the Sigmoid function.
+        Computes the derivative of the ReLU function.
         """
-        result = Tensor([[0 for _r in range(tensor.shape[1]) ] for _c in range(tensor.shape[0])])
+        result = Tensor([[0 for _ in range(tensor.shape[1])] for _ in range(tensor.shape[0])], tensor.shape)
         for i in range(tensor.shape[0]):
             for j in range(tensor.shape[1]):
-                if tensor.get([i, j]) != 0:
-                    result.set([i, j], 1)
-                else:
-                    result.set([i, j], 0)
+                result.set((i, j), 1 if tensor.get((i, j)) > 0 else 0)  # Fixed edge case
         return result

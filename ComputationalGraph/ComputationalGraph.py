@@ -29,32 +29,23 @@ class ComputationalGraph:
         second_function: FunctionType (e.g., 'SIGMOID').
         isBiased: Boolean
         :return: The newly created or linked computational node.
-        """
-        if isinstance(second, FunctionType):  # FunctionType case
+        """        
+        if isinstance(second, FunctionType):  # Activation function case
             new_node = ComputationalNode(learnable=False, function_type=second, isBiased=isBiased)
-            if first not in self.node_map.keys():
-                self.node_map[first] = []
-            self.node_map[first].append(new_node)
-            if new_node not in self.reverse_node_map.keys():
-                self.reverse_node_map[new_node] = []
-            self.reverse_node_map[new_node].append(first)
-            return new_node
-        
-        elif isinstance(second, ComputationalNode):  # ComputationalNode case
+        elif isinstance(second, ComputationalNode):  # Computational node case
             new_node = ComputationalNode(learnable=False, operator=second.getOperator(), isBiased=isBiased)
-            if first not in self.node_map.keys():
-                self.node_map[first] = []
-            if second not in self.node_map.keys():
-                self.node_map[second] = []
-            self.node_map[first].append(new_node)
-            self.node_map[second].append(new_node)
-            if new_node not in self.reverse_node_map.keys():
-                self.reverse_node_map[new_node] = []
-            self.reverse_node_map[new_node].append(first)
-            self.reverse_node_map[new_node].append(second)
-            return new_node
         else:
-            raise ValueError("Invalid type for second_or_function. Must be a ComputationalNode or FunctionType.")
+            raise ValueError("Invalid type for 'second'. Must be a ComputationalNode or FunctionType.")
+
+        # Establish connections in graph structure
+        self.node_map[first].append(new_node)
+        self.reverse_node_map[new_node].append(first)
+
+        if isinstance(second, ComputationalNode):
+            self.node_map[second].append(new_node)
+            self.reverse_node_map[new_node].append(second)
+            
+        return new_node
 
     def sort(self, node: ComputationalNode, visited: Set[ComputationalNode]) -> List[ComputationalNode]:
         """
@@ -152,7 +143,7 @@ class ComputationalGraph:
                 function = Softmax()
             else:
                 raise ValueError(f"Unsupported function type: {child.getFunctionType()}")
-            return child.getBackward().__mul__(function.derivative(child.getValue()))
+            return child.getBackward() * function.derivative(child.getValue())  # Optimized element-wise multiplication
 
         else:
             right = self.reverse_node_map.get(child)[1]
@@ -184,7 +175,7 @@ class ComputationalGraph:
         :param learning_rate: The learning rate for gradient descent.
         :param class_label_index: A list of true class labels (index of the correct class for each sample).
         """
-        rows, cols = output.getValue().shape[1], output.getValue().shape[0]
+        rows, cols = output.getValue().shape[0], output.getValue().shape[1]
         backward = Tensor([[0 for _c in range(cols)] for _r in range(rows)])
         for i in range(rows):
             for j in range(cols):
@@ -210,7 +201,10 @@ class ComputationalGraph:
                 if node.getBackward() is None:
                     node.setBackward(self.calculateDerivative(node, child))
                 else:
-                    node.getBackward().__add__(self.calculateDerivative(node, child))
+                    for i in range(node.getBackward().shape[0]):
+                        for j in range(node.getBackward().shape[1]):
+                            node.getBackward().set((i, j), node.getBackward().get((i, j)) + self.calculateDerivative(node, child).get((i, j)))
+
         self.updateValues()
         self.clear()
 
@@ -242,7 +236,7 @@ class ComputationalGraph:
         sorted_nodes = self.topologicalSort()
         output_node = sorted_nodes[0]
 
-        while len(sorted_nodes) != 1:
+        while len(sorted_nodes) > 1:
             current_node = sorted_nodes.pop()
             for child in self.node_map.get(current_node):
                 if child.getValue() == None:

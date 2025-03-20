@@ -72,12 +72,12 @@ class ComputationalNode:
 
     def updateValue(self):
         """
-        Update the values.
+        Update the values of the node using the backward gradients.
         """
         if self.value is not None and self.backward is not None:
             for i in range(self.value.shape[0]): 
                 for j in range(self.value.shape[1]):
-                    self.value.set([i, j], self.value.get([i, j]) + self.backward.get([i, j]))
+                    self.value.set((i, j), self.value.get((i, j)) + self.backward.get((i, j)))  # Fixed tuple indexing
 
     def isLearnable(self):
         """

@@ -60,7 +60,7 @@ class TestComputationalGraph(unittest.TestCase):
         graph.addEdge(first=a3, second=FunctionType.SOFTMAX, isBiased=False)
         
         # Training loop
-        epochs = 5
+        epochs = 100
         learning_rate = 0.1
         etaDecrease = 0.99
         class_list = []
