@@ -27,7 +27,7 @@ class TestComputationalGraph(unittest.TestCase):
         test_set = []
         data_set = []
 
-        with open(os.path.join("test", "iris.txt"), "r") as file:
+        with open(os.path.join("../test", "iris.txt"), "r") as file:
             for line in file:
                 instance = line.strip().split(",")
                 data_set.append(instance)
