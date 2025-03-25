@@ -8,8 +8,8 @@ from ComputationalGraph.ComputationalGraph import ComputationalGraph
 from ComputationalGraph.ComputationalNode import ComputationalNode
 from ComputationalGraph.FunctionType import FunctionType
 
-
 random.seed(10)
+
 
 class TestComputationalGraph(unittest.TestCase):
     def create_input_tensor(self, instance: List[str]) -> Tensor:
@@ -33,7 +33,7 @@ class TestComputationalGraph(unittest.TestCase):
                 data_set.append(instance)
                 if instance[-1] not in label_map:
                     label_map[instance[-1]] = len(label_map)
-        
+
         random.shuffle(data_set)
         for i, instance in enumerate(data_set):
             if i >= 120:
@@ -43,7 +43,7 @@ class TestComputationalGraph(unittest.TestCase):
 
         graph = ComputationalGraph()
         input_node = ComputationalNode(learnable=False, operator="*", isBiased=True)
-        
+
         m1 = Tensor([[random.uniform(-0.01, 0.01) for _c in range(4)] for _r in range(5)])
         w1 = ComputationalNode(value=m1, operator="*")
         a1 = graph.addEdge(first=input_node, second=w1, isBiased=True)
@@ -58,7 +58,7 @@ class TestComputationalGraph(unittest.TestCase):
         w3 = ComputationalNode(value=m3, operator="*")
         a3 = graph.addEdge(first=a2_sigmoid, second=w3, isBiased=False)
         graph.addEdge(first=a3, second=FunctionType.SOFTMAX, isBiased=False)
-        
+
         # Training loop
         epochs = 100
         learning_rate = 0.1
@@ -71,9 +71,9 @@ class TestComputationalGraph(unittest.TestCase):
                 graph.forwardCalculation()
                 class_list = [label_map[instance[-1]]]
                 graph.backpropagation(learning_rate, class_list)
-                
+
             learning_rate *= etaDecrease
-        
+
         # Evaluate on test set
         correct = 0
         for instance in test_set:
