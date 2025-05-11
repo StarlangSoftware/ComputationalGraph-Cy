@@ -4,11 +4,11 @@ from ComputationalGraph.FunctionType import FunctionType
 
 class ComputationalNode:
     def __init__(self, 
-                learnable: bool=True, 
-                isBiased: bool=False, 
-                operator: str=None, 
-                function_type: FunctionType=None, 
-                value: Tensor=None):
+             learnable: bool = True, 
+             isBiased: bool = False, 
+             operator: str = None, 
+             function_type: FunctionType = None, 
+             value: Tensor = None) -> None:
         """
         Initializes a ComputationalNode.
         :param learnable: Indicates whether the node is learnable (e.g., weights).
@@ -24,7 +24,7 @@ class ComputationalNode:
         self.operator = operator
         self.function_type = function_type
 
-    def __str__(self):
+    def __str__(self) -> str:
         details = []
         if self.function_type:
             details.append(f"Function: {self.function_type}")
@@ -36,41 +36,41 @@ class ComputationalNode:
         details.append(f"is biased: {self.is_biased}")
         return f"Node({', '.join(details)})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
-    def isBiased(self):
+    def isBiased(self) -> bool:
         """
         Returns whether the node is biased.
         """
         return self.is_biased
 
-    def getFunctionType(self):
+    def getFunctionType(self) -> FunctionType:
         """
         Returns the function type of the node.
         """
         return self.function_type
 
-    def getOperator(self):
+    def getOperator(self) -> str:
         """
         Returns the operator of the node.
         """
         return self.operator
 
-    def getValue(self):
+    def getValue(self) -> Tensor:
         """
         Returns the value of the node.
         """
         return self.value
 
-    def setValue(self, value):
+    def setValue(self, value: Tensor) -> None:
         """
         Sets the value of the node.
         :param value: The new value (Tensor object).
         """
         self.value = value
 
-    def updateValue(self):
+    def updateValue(self) -> None:
         """
         Update the values of the node using the backward gradients.
         """
@@ -79,19 +79,19 @@ class ComputationalNode:
                 for j in range(self.value.shape[1]):
                     self.value.set((i, j), self.value.get((i, j)) + self.backward.get((i, j)))  # Fixed tuple indexing
 
-    def isLearnable(self):
+    def isLearnable(self) -> bool:
         """
         Returns whether the node is learnable.
         """
         return self.learnable
 
-    def getBackward(self):
+    def getBackward(self) -> Tensor:
         """
         Returns the backward gradient of the node.
         """
         return self.backward
 
-    def setBackward(self, backward):
+    def setBackward(self, backward: Tensor) -> None:
         """
         Sets the backward gradient of the node.
         :param backward: The gradient tensor (Tensor object).
