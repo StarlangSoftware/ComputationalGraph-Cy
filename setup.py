@@ -6,7 +6,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 
 setup(
-    name='ComputationalGraph-Py',
+    name='NlpToolkit-ComputationalGraph',
     version='1.0.0',
     packages=['ComputationalGraph'],
     url='https://github.com/StarlangSoftware/ComputationalGraph-Py',
