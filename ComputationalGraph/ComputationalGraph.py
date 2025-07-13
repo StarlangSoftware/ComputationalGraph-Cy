@@ -143,16 +143,16 @@ class ComputationalGraph:
                 function = Softmax()
             else:
                 raise ValueError(f"Unsupported function type: {child.getFunctionType()}")
-            return child.getBackward() * function.derivative(child.getValue())  # Optimized element-wise multiplication
+            return child.getBackward().hadamardProduct(function.derivative(child.getValue()))  # Optimized element-wise multiplication
 
         else:
             right = self.reverse_node_map.get(child)[1]
             if child.getOperator() == '*':
                 if left == node:
                     if child.isBiased() == False:
-                        return child.getBackward().dot(right.getValue().transpose())
-                    return child.getBackward().partial([0, 0], [child.getBackward().shape[0] ,child.getBackward().shape[1] - 1]).dot(right.getValue().transpose())
-                return left.getValue().transpose().dot(child.getBackward())
+                        return child.getBackward().multiply(right.getValue().transpose())
+                    return child.getBackward().partial([0, 0], [child.getBackward().shape[0] ,child.getBackward().shape[1] - 1]).multiply(right.getValue().transpose())
+                return left.getValue().transpose().multiply(child.getBackward())
 
             elif child.getOperator() == '+':
                 return child.getBackward()
@@ -263,16 +263,16 @@ class ComputationalGraph:
                             if current_node.isBiased():
                                 self.getBiased(current_node)
                             if child.getValue().shape[1] == current_node.getValue().shape[0]:
-                                child.setValue(child.getValue().dot(current_node.getValue()))
+                                child.setValue(child.getValue().multiply(current_node.getValue()))
                             else:
-                                child.setValue(current_node.getValue().dot(child.getValue()))
+                                child.setValue(current_node.getValue().multiply(child.getValue()))
                         elif child.getOperator() == '+':
                             result = child.getValue()
-                            result.__add__(current_node.getValue())
+                            result.add(current_node.getValue())
                             child.setValue(result)
                         elif child.operator == '-':
                             result = child.getValue().clone()
-                            result.__sub__(current_node.getValue())
+                            result.subtract(current_node.getValue())
                             child.setValue(result)
                         else:
                             raise ValueError(f"Unsupported operator: {child.getOperator()}")
