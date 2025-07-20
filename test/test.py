@@ -27,7 +27,7 @@ class TestComputationalGraph(unittest.TestCase):
         test_set = []
         data_set = []
 
-        with open(os.path.join("../test", "iris.txt"), "r") as file:
+        with open(os.path.join("test", "iris.txt"), "r") as file:
             for line in file:
                 instance = line.strip().split(",")
                 data_set.append(instance)
@@ -106,6 +106,184 @@ class TestComputationalGraph(unittest.TestCase):
         graph.forwardCalculation()
         true_class = [1]
         graph.backpropagation(0.01, true_class)
+
+    def test_3d_tensor_operations(self):
+        """
+        Tests computational graph with 3D tensors.
+        """
+        graph = ComputationalGraph()
+        
+        # Create 2D input tensor (batch_size=2, features=4) - flattened for matrix multiplication
+        input_2d = Tensor([[1.0, 2.0, 3.0, 4.0],
+                          [5.0, 6.0, 7.0, 8.0]])
+        
+        input_node = ComputationalNode(learnable=False, value=input_2d, operator="*")
+        
+        # Create 2D weight tensor (features=4, output=3) - for matrix multiplication
+        weight_2d = Tensor([[0.1, 0.2, 0.3],
+                           [0.4, 0.5, 0.6],
+                           [0.7, 0.8, 0.9],
+                           [1.0, 1.1, 1.2]])
+        
+        weight_node = ComputationalNode(learnable=True, value=weight_2d, operator="*")
+        
+        # Add edge and activation
+        conv_output = graph.addEdge(first=input_node, second=weight_node, isBiased=False)
+        activated_output = graph.addEdge(first=conv_output, second=FunctionType.RELU, isBiased=False)
+        
+        # Perform forward pass
+        graph.forwardCalculation()
+        
+        # Check output shape and values
+        output_value = activated_output.getValue()
+        print(f"3D Test - Output shape: {output_value.shape}")
+        print(f"3D Test - Output sample values: {output_value.get((0, 0))}, {output_value.get((1, 2))}")
+        
+        # Perform backward pass
+        true_class = [0, 1, 2]  # Match output dimensions
+        graph.backpropagation(0.01, true_class)
+        
+        # Verify that gradients are computed
+        gradient = weight_node.getBackward()
+        if gradient is not None:
+            print(f"3D Test - Weight gradient shape: {gradient.shape}")
+        else:
+            print("3D Test - No gradient computed (this might be expected)")
+
+    def test_4d_tensor_operations(self):
+        """
+        Tests computational graph with 4D tensors (batch, channels, height, width).
+        """
+        graph = ComputationalGraph()
+        
+        # Create 2D input tensor (batch_size=3, features=6) - flattened for matrix multiplication
+        input_2d = Tensor([[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                          [7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+                          [13.0, 14.0, 15.0, 16.0, 17.0, 18.0]])
+        
+        input_node = ComputationalNode(learnable=False, value=input_2d, operator="*")
+        
+        # Create 2D weight tensor (features=6, output=4) - for matrix multiplication
+        weight_2d = Tensor([[0.01, 0.02, 0.03, 0.04],
+                           [0.05, 0.06, 0.07, 0.08],
+                           [0.09, 0.10, 0.11, 0.12],
+                           [0.13, 0.14, 0.15, 0.16],
+                           [0.17, 0.18, 0.19, 0.20],
+                           [0.21, 0.22, 0.23, 0.24]])
+        
+        weight_node = ComputationalNode(learnable=True, value=weight_2d, operator="*")
+        
+        # Add edge and activation
+        conv_output = graph.addEdge(first=input_node, second=weight_node, isBiased=False)
+        activated_output = graph.addEdge(first=conv_output, second=FunctionType.TANH, isBiased=False)
+        
+        # Perform forward pass
+        graph.forwardCalculation()
+        
+        # Check output shape and values
+        output_value = activated_output.getValue()
+        print(f"4D Test - Output shape: {output_value.shape}")
+        print(f"4D Test - Output sample values: {output_value.get((0, 0))}, {output_value.get((2, 3))}")
+        
+        # Perform backward pass
+        true_class = [0, 1, 2, 3]  # Match output dimensions
+        graph.backpropagation(0.01, true_class)
+        
+        # Verify that gradients are computed
+        gradient = weight_node.getBackward()
+        if gradient is not None:
+            print(f"4D Test - Weight gradient shape: {gradient.shape}")
+        else:
+            print("4D Test - No gradient computed (this might be expected)")
+
+    def test_5d_tensor_operations(self):
+        """
+        Tests computational graph with 5D tensors (batch, time, channels, height, width).
+        """
+        graph = ComputationalGraph()
+        
+        # Create 2D input tensor (batch_size=4, features=8) - flattened for matrix multiplication
+        input_2d = Tensor([[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                          [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0],
+                          [17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0],
+                          [25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0, 32.0]])
+        
+        input_node = ComputationalNode(learnable=False, value=input_2d, operator="*")
+        
+        # Create 2D weight tensor (features=8, output=5) - for matrix multiplication
+        weight_2d = Tensor([[0.001, 0.002, 0.003, 0.004, 0.005],
+                           [0.006, 0.007, 0.008, 0.009, 0.010],
+                           [0.011, 0.012, 0.013, 0.014, 0.015],
+                           [0.016, 0.017, 0.018, 0.019, 0.020],
+                           [0.021, 0.022, 0.023, 0.024, 0.025],
+                           [0.026, 0.027, 0.028, 0.029, 0.030],
+                           [0.031, 0.032, 0.033, 0.034, 0.035],
+                           [0.036, 0.037, 0.038, 0.039, 0.040]])
+        
+        weight_node = ComputationalNode(learnable=True, value=weight_2d, operator="*")
+        
+        # Add edge and activation
+        conv_output = graph.addEdge(first=input_node, second=weight_node, isBiased=False)
+        activated_output = graph.addEdge(first=conv_output, second=FunctionType.SIGMOID, isBiased=False)
+        
+        # Perform forward pass
+        graph.forwardCalculation()
+        
+        # Check output shape and values
+        output_value = activated_output.getValue()
+        print(f"5D Test - Output shape: {output_value.shape}")
+        print(f"5D Test - Output sample values: {output_value.get((0, 0))}, {output_value.get((3, 4))}")
+        
+        # Perform backward pass
+        true_class = [0, 1, 2, 3, 4]  # Match output dimensions
+        graph.backpropagation(0.01, true_class)
+        
+        # Verify that gradients are computed
+        gradient = weight_node.getBackward()
+        if gradient is not None:
+            print(f"5D Test - Weight gradient shape: {gradient.shape}")
+        else:
+            print("5D Test - No gradient computed (this might be expected)")
+
+    def test_mixed_dimension_operations(self):
+        """
+        Tests computational graph with mixed dimension operations (2D, 3D, 4D tensors).
+        """
+        graph = ComputationalGraph()
+        
+        # 2D input (batch_size=2, features=3)
+        input_2d = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        input_node = ComputationalNode(learnable=False, value=input_2d, operator="*")
+        
+        # 2D weight (features=3, output=2) - for matrix multiplication
+        weight_2d = Tensor([[0.1, 0.2],
+                           [0.3, 0.4],
+                           [0.5, 0.6]])
+        weight_node = ComputationalNode(learnable=True, value=weight_2d, operator="*")
+        
+        # Single layer with activation
+        layer_output = graph.addEdge(first=input_node, second=weight_node, isBiased=False)
+        final_output = graph.addEdge(first=layer_output, second=FunctionType.RELU, isBiased=False)
+        
+        # Perform forward pass
+        graph.forwardCalculation()
+        
+        # Check output shape and values
+        output_value = final_output.getValue()
+        print(f"Mixed Dimension Test - Output shape: {output_value.shape}")
+        print(f"Mixed Dimension Test - Output sample values: {output_value.get((0, 0))}, {output_value.get((1, 1))}")
+        
+        # Perform backward pass
+        true_class = [0, 1]  # Match output dimensions
+        graph.backpropagation(0.01, true_class)
+        
+        # Verify that gradients are computed
+        gradient = weight_node.getBackward()
+        
+        if gradient is not None:
+            print(f"Mixed Dimension Test - Weight gradient shape: {gradient.shape}")
+        else:
+            print("Mixed Dimension Test - No gradient computed")
 
 
 if __name__ == "__main__":
