@@ -1,38 +1,46 @@
+from __future__ import annotations
+
 import math
-from ComputationalGraph.Function import Function
+from typing import List, Tuple
+
 from Math.Tensor import Tensor
 
-class Softmax(Function):
+
+class Softmax:
     """
-    Implements the Softmax activation function.
+    Row-wise softmax over the last dimension (Java parity).
     """
 
-    def calculate(self, tensor: Tensor) -> Tensor:
-        """
-        Computes the Softmax activation for the given tensor.
-        """
-        result = Tensor([[0 for _ in range(tensor.shape[1])] for _ in range(tensor.shape[0])], tensor.shape)
-        for i in range(tensor.shape[0]):
-            exp_values = [math.exp(tensor.get((i, k))) for k in range(tensor.shape[1])]
-            _sum = sum(exp_values)
-            for k in range(tensor.shape[1]):
-                result.set((i, k), exp_values[k] / _sum)  # Fixed indexing
-        return result
+    def calculate(self, x: Tensor) -> Tensor:
+        # Treat 1D as (1, D)
+        if len(x.shape) == 1:
+            x = x.reshape((1, x.shape[0]))
 
-    def derivative(self, tensor: Tensor) -> Tensor:
-        """
-        Computes the derivative of the Softmax function.
-        """
-        rows, cols = tensor.shape
-        result = Tensor(
-            [[[0 for _ in range(cols)] for _ in range(cols)] for _ in range(rows)],
-            (rows, cols, cols)
-        )  # Full Jacobian matrix
+        last = x.shape[-1]
+        out = Tensor([0.0] * _numel(x.shape), x.shape)
 
-        for i in range(rows):
-            for j in range(cols):
-                s_i = tensor.get((i, j))
-                for k in range(cols):
-                    s_k = tensor.get((i, k))
-                    result.set((i, j, k), s_i * (1 - s_k) if j == k else -s_i * s_k)  # Fixed Jacobian calculation
-        return result
+        # Softmax per row (all dims except last collapsed)
+        rows = _numel(x.shape) // last
+        for r in range(rows):
+            base = r * last
+            row = x.data[base : base + last]
+            m = max(row)
+            exps = [math.exp(v - m) for v in row]
+            s = sum(exps)
+            for j, ev in enumerate(exps):
+                out.data[base + j] = ev / s
+        return out
+
+    def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
+        """
+        Java typically composes Softmax with cross-entropy, where dL/dz = (R - Y).
+        In this codebase, backprop starts with R-Y already, so Softmax derivative is identity passthrough.
+        """
+        return backward
+
+
+def _numel(shape: Tuple[int, ...]) -> int:
+    n = 1
+    for d in shape:
+        n *= int(d)
+    return int(n)

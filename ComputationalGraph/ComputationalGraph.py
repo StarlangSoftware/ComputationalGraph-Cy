@@ -1,290 +1,460 @@
-from typing import List, Set, Optional, Union
-from collections import defaultdict, deque
+from __future__ import annotations
 
-from Math.Tensor import Tensor 
-from ComputationalGraph.ComputationalNode import ComputationalNode 
-from ComputationalGraph.Softmax import Softmax
-from ComputationalGraph.Sigmoid import Sigmoid
-from ComputationalGraph.FunctionType import FunctionType
-from ComputationalGraph.Tanh import Tanh
-from ComputationalGraph.ReLU import ReLU
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set, Tuple
+import pickle
+
+from ComputationalGraph.ComputationalNode import ComputationalNode
+from ComputationalGraph.MultiplicationNode import MultiplicationNode
+
+from Math.Tensor import Tensor
 
 
 class ComputationalGraph:
-    def __init__(self):
-        """
-        Initializes the computational graph with node maps for forward and reverse connections.
-        """
-        self.node_map = defaultdict(list)
-        self.reverse_node_map = defaultdict(list)
+    """
+    Python port of Java ComputationalGraph/ComputationalGraph.java.
 
-    def addEdge(self, 
-                first: ComputationalNode, 
-                second: Optional[Union[ComputationalNode, FunctionType]] = None, 
-                isBiased: bool = False) -> ComputationalNode:
-        """
-        Adds an edge to the computational graph.
-        :param 
-        second_node: Child node (ComputationalNode) .
-        second_function: FunctionType (e.g., 'SIGMOID').
-        isBiased: Boolean
-        :return: The newly created or linked computational node.
-        """        
-        if isinstance(second, FunctionType):  # Activation function case
-            new_node = ComputationalNode(learnable=False, function_type=second, isBiased=isBiased)
-        elif isinstance(second, ComputationalNode):  # Computational node case
-            new_node = ComputationalNode(learnable=False, operator=second.getOperator(), isBiased=isBiased)
-        else:
-            raise ValueError("Invalid type for 'second'. Must be a ComputationalNode or FunctionType.")
+    Semantics to preserve:
+    - nodeMap: parent -> [children]
+    - reverseNodeMap: child -> [parents]
+    - topologicalSort(): DFS postorder; first element ends up being output node.
+      forwardCalculation consumes nodes from END (inputs toward output).
+      backpropagation consumes nodes from FRONT (output toward inputs).
+    """
 
-        # Establish connections in graph structure
-        self.node_map[first].append(new_node)
-        self.reverse_node_map[new_node].append(first)
+    def __init__(self) -> None:
+        self.nodeMap: Dict[Any, List[Any]] = {}
+        self.reverseNodeMap: Dict[Any, List[Any]] = {}
+        self.inputNodes: List[Any] = []
 
-        if isinstance(second, ComputationalNode):
-            self.node_map[second].append(new_node)
-            self.reverse_node_map[new_node].append(second)
-            
-        return new_node
+    # --- abstract surface (mirrors Java) ---
+    def train(self, trainSet: List[Tensor], parameters: Any) -> None:
+        raise NotImplementedError
 
-    def sort(self, node: ComputationalNode, visited: Set[ComputationalNode]) -> List[ComputationalNode]:
+    def test(self, testSet: List[Tensor]) -> Any:
+        raise NotImplementedError
+
+    def getClassLabels(self, outputNode: Any) -> List[int]:
+        raise NotImplementedError
+
+    # --- graph wiring ---
+    def _link(self, parent: Any, child: Any) -> None:
+        self.nodeMap.setdefault(parent, []).append(child)
+        self.reverseNodeMap.setdefault(child, []).append(parent)
+
+    def addEdge(self, first: Any, second: Any, isBiased: bool) -> Any:
         """
-        Recursive helper function to perform depth-first search for topological sorting.
-        :param node: The current node being processed.
-        :param visited: A set of visited nodes.
-        :return: A list representing the partial topological order.
+        Java: addEdge(ComputationalNode first, Object second, boolean isBiased)
+
+        second can be:
+        - Function (has calculate/derivative)  -> creates a ComputationalNode(function=second)
+        - Node (weights / another node)       -> creates a MultiplicationNode and links (first, second) -> newNode
+        - MultiplicationNode (rare as "second", but allow it for parity) -> same as Node, but keep hadamard flag
         """
-        queue = deque()
+        # Case 1: Function edge
+        if hasattr(second, "calculate") and hasattr(second, "derivative"):
+            newNode = self._new_computational_node(learnable=False, function=second, isBiased=isBiased)
+            self._link(first, newNode)
+            return newNode
+
+        # Case 2: Node-like (including MultiplicationNode weights node)
+        if self._is_node(second):
+            is_hadamard = bool(second.isHadamard()) if hasattr(second, "isHadamard") else False
+            newNode = self._new_multiplication_node(
+                learnable=False,
+                isBiased=isBiased,
+                isHadamard=is_hadamard,
+                priorityNode=first,
+            )
+            self._link(first, newNode)
+            self._link(second, newNode)
+            return newNode
+
+        raise ValueError("Illegal Type of Object: second")
+
+    def addEdgeMul(self, first: Any, second: Any, isBiased: bool, isHadamard: bool) -> Any:
+        """Java: addEdge(first, second, isBiased, isHadamard)."""
+        newNode = self._new_multiplication_node(
+            learnable=False, isBiased=isBiased, isHadamard=isHadamard, priorityNode=first
+        )
+        self._link(first, newNode)
+        self._link(second, newNode)
+        return newNode
+
+    def addAdditionEdge(self, first: Any, second: Any, isBiased: bool) -> Any:
+        """Java: addAdditionEdge(...) creates a plain node with no function."""
+        newNode = self._new_computational_node(learnable=False, function=None, isBiased=isBiased)
+        self._link(first, newNode)
+        self._link(second, newNode)
+        return newNode
+
+    def concatEdges(self, nodes: List[Any], dimension: int) -> Any:
+        """Java: creates ConcatenatedNode(dimension) and links all inputs to it."""
+        newNode = self._new_concatenated_node(dimension=dimension)
+        for n in nodes:
+            self._link(n, newNode)
+            if hasattr(newNode, "addNode"):
+                newNode.addNode(n)
+        return newNode
+
+    # --- topo sort ---
+    def _sortRecursive(self, node: Any, visited: Set[Any]) -> List[Any]:
+        queue: List[Any] = []
         visited.add(node)
-        if node in self.node_map:
-            for child in self.node_map.get(node):
+        if node in self.nodeMap:
+            for child in self.nodeMap[node]:
                 if child not in visited:
-                    queue.extend(self.sort(child, visited))
-        queue.append(node)  
+                    queue.extend(self._sortRecursive(child, visited))
+        queue.append(node)  # postorder
         return queue
 
-    def topologicalSort(self) -> List[ComputationalNode]:
-        """
-        Performs topological sorting on the computational graph.
-        :param node_map: A dictionary representing the graph (node -> list of child nodes).
-        :return: A list representing the topological order of the nodes.
-        """
-        sorted_list = deque()
-        visited = set()
-        for node in self.node_map:
+    def topologicalSort(self) -> List[Any]:
+        sortedList: List[Any] = []
+        visited: Set[Any] = set()
+        for node in list(self.nodeMap.keys()):
             if node not in visited:
-                queue = self.sort(node, visited)
-                while (queue):
-                    sorted_list.append(queue.popleft())
-        return list(sorted_list) 
-    
-    def clearRecursive(self, visited: Set[ComputationalNode], node: ComputationalNode) -> None:
-        """
-        Recursive helper function to clear the values and gradients of nodes.
-        """
-        visited.add(node)
-        if node.isLearnable() == False:
-            node.setValue(None)  
-        node.setBackward(None)
+                queue = self._sortRecursive(node, visited)
+                sortedList.extend(queue)
+        return sortedList
 
-        if node in self.node_map.keys():
-            for child in self.node_map.get(node):
+    # --- clear ---
+    def _clearRecursive(self, visited: Set[Any], node: Any) -> None:
+        visited.add(node)
+        if hasattr(node, "isLearnable") and not node.isLearnable():
+            if hasattr(node, "setValue"):
+                node.setValue(None)
+        if hasattr(node, "setBackward"):
+            node.setBackward(None)
+        if node in self.nodeMap:
+            for child in self.nodeMap[node]:
                 if child not in visited:
-                    self.clearRecursive(visited, child)
+                    self._clearRecursive(visited, child)
 
     def clear(self) -> None:
-        """
-        Clears the values and gradients of all nodes in the graph.
-        """
-        visited = set()
-        for node in self.node_map.keys():
+        visited: Set[Any] = set()
+        for node in list(self.nodeMap.keys()):
             if node not in visited:
-                self.clearRecursive(visited, node)
+                self._clearRecursive(visited, node)
 
-    def updateRecursive(self, visited: Set[ComputationalNode], node: ComputationalNode) -> None:
-        """
-        Recursive helper function to update the values of learnable nodes.
-        """
-        visited.add(node)
-        if node.isLearnable():
-            node.updateValue()  
+    # --- tensor helpers matching Java semantics ---
+    @staticmethod
+    def _transposeAxes(length: int) -> Tuple[int, ...]:
+        axes = list(range(length))
+        if length >= 2:
+            axes[-1], axes[-2] = axes[-2], axes[-1]
+        return tuple(axes)
 
-        if node in self.node_map.keys():
-            for child in self.node_map.get(node):
-                if child not in visited:
-                    self.updateRecursive(visited, child)
+    @staticmethod
+    def _getBiasedPartial(t: Tensor) -> Tensor:
+        end = list(t.shape)
+        end[-1] = end[-1] - 1
+        start = (0,) * len(t.shape)
+        return t.partial(start, tuple(end))
 
-    def updateValues(self) -> None:
-        """
-        Updates the values of all learnable nodes in the graph.
-        """
-        visited = set()
-        for node in self.node_map.keys():
-            if node not in visited:
-                self.updateRecursive(visited, node)
-    
-    def calculateDerivative(self, node: ComputationalNode, child: ComputationalNode) -> Tensor:
-        """
-        Calculates the derivative of the child node with respect to the parent node.
-        :param node: Parent node.
-        :param child: Child node.
-        :return: The gradient tensor.
-        """
-        left = self.reverse_node_map.get(child)[0]
-        if len(self.reverse_node_map.get(child)) == 1:
-            function = None
-            if child.getFunctionType() == FunctionType.SIGMOID:
-                function = Sigmoid()
-            elif child.getFunctionType() == FunctionType.TANH:
-                function = Tanh()
-            elif child.getFunctionType() == FunctionType.RELU:
-                function = ReLU()
-            elif child.getFunctionType() == FunctionType.SOFTMAX:
-                function = Softmax()
-            else:
-                raise ValueError(f"Unsupported function type: {child.getFunctionType()}")
-            return child.getBackward().hadamardProduct(function.derivative(child.getValue()))  # Optimized element-wise multiplication
+    @staticmethod
+    def _matmul(a: Tensor, b: Tensor) -> Tensor:
+        # Java Tensor.multiply() == matmul; Python Tensor.dot provides matmul
+        return a.dot(b)
 
+    @staticmethod
+    def _hadamard(a: Tensor, b: Tensor) -> Tensor:
+        # Java hadamardProduct
+        return a * b
+
+    @staticmethod
+    def _concat(a: Tensor, b: Tensor, dim: int) -> Tensor:
+        # Tensor API doesn't expose concat; implement using get/set.
+        if len(a.shape) != len(b.shape):
+            raise ValueError("concat requires same rank")
+        for i in range(len(a.shape)):
+            if i != dim and a.shape[i] != b.shape[i]:
+                raise ValueError("concat requires equal shapes except concat dim")
+
+        new_shape = list(a.shape)
+        new_shape[dim] = a.shape[dim] + b.shape[dim]
+        out = Tensor([0.0] * _numel(tuple(new_shape)), tuple(new_shape))
+
+        def iter_indices(shape: Tuple[int, ...]):
+            strides = _strides(shape)
+            for flat in range(_numel(shape)):
+                yield tuple(_unflatten(flat, strides))
+
+        for idx in iter_indices(a.shape):
+            out.set(idx, a.get(idx))
+        for idx in iter_indices(b.shape):
+            out_idx = list(idx)
+            out_idx[dim] += a.shape[dim]
+            out.set(tuple(out_idx), b.get(idx))
+        return out
+
+    # --- backprop core ---
+    def _calculateDerivative(self, node: Any, child: Any) -> Optional[Tensor]:
+        reverseParents = self.reverseNodeMap.get(child)
+        if not reverseParents:
+            return None
+
+        child_backward: Optional[Tensor] = child.getBackward() if hasattr(child, "getBackward") else None
+        if child_backward is None:
+            return None
+
+        if hasattr(child, "isBiased") and child.isBiased():
+            backward = self._getBiasedPartial(child_backward)
         else:
-            right = self.reverse_node_map.get(child)[1]
-            if child.getOperator() == '*':
-                if left == node:
-                    if child.isBiased() == False:
-                        return child.getBackward().multiply(right.getValue().transpose())
-                    return child.getBackward().partial([0, 0], [child.getBackward().shape[0] ,child.getBackward().shape[1] - 1]).multiply(right.getValue().transpose())
-                return left.getValue().transpose().multiply(child.getBackward())
+            backward = child_backward
 
-            elif child.getOperator() == '+':
-                return child.getBackward()
+        func = child.getFunction() if hasattr(child, "getFunction") else None
+        if func is not None:
+            child_value: Optional[Tensor] = child.getValue()
+            if child_value is None:
+                return None
+            if hasattr(child, "isBiased") and child.isBiased():
+                child_value = self._getBiasedPartial(child_value)
+            return func.derivative(child_value, backward)
 
-            elif child.getOperator() == '-':
-                if left == node:
-                    return child.getBackward()
-                else:
-                    result = child.getBackward()
-                    for i in range(result.shape[0]):
-                        for j in range(result.shape[1]):
-                            result.set([i, j], -result.get([i, j]))
-                    return result
-        return None
+        if self._is_concatenated_node(child):
+            dim = child.getDimension()
+            idx_in_concat = child.getIndex(node)
+            parents = reverseParents
+            block = backward.shape[dim] // len(parents)
 
-    def calculateRMinusY(self, output: ComputationalNode, learning_rate: float, class_label_index: List[int]) -> None:
-        """
-        Computes the difference between the predicted and actual values (R - Y).
-        :param output: The output node of the computational graph.
-        :param learning_rate: The learning rate for gradient descent.
-        :param class_label_index: A list of true class labels (index of the correct class for each sample).
-        """
-        rows, cols = output.getValue().shape[0], output.getValue().shape[1]
-        backward = Tensor([[0 for _c in range(cols)] for _r in range(rows)])
-        for i in range(rows):
-            for j in range(cols):
-                if class_label_index[i] == j:
-                    backward.set([i, j], (1 - output.getValue().get([i, j])) * learning_rate)
-                else:
-                    backward.set([i, j], (-output.getValue().get([i, j])) * learning_rate)
-        output.setBackward(backward)
+            new_shape = list(backward.shape)
+            new_shape[dim] = block
+            out = Tensor([0.0] * _numel(tuple(new_shape)), tuple(new_shape))
 
-    def backpropagation(self, learning_rate: float, class_label_index: List[int]) -> None:
-        """
-        Performs backpropagation on the computational graph.
-        :param learning_rate: The learning rate for gradient descent.
-        :param class_label_index: The true class labels (as a list of integers).
-        """
-        sorted_nodes = self.topologicalSort()
-        output_node = sorted_nodes.pop(0)  
-        self.calculateRMinusY(output_node, learning_rate, class_label_index)
-        sorted_nodes.pop(0).setBackward(output_node.getBackward())
-        while len(sorted_nodes) != 0:
-            node = sorted_nodes.pop(0)  
-            for child in self.node_map.get(node):
+            out_strides = _strides(tuple(new_shape))
+            for flat in range(_numel(tuple(new_shape))):
+                out_idx = _unflatten(flat, out_strides)
+                bwd_idx = list(out_idx)
+                bwd_idx[dim] += idx_in_concat * block
+                out.set(tuple(out_idx), backward.get(tuple(bwd_idx)))
+            return out
+
+        if self._is_multiplication_node(child):
+            left, right = reverseParents[0], reverseParents[1]
+            is_hadamard = child.isHadamard()
+            if left == node:
+                right_val = right.getValue()
+                if is_hadamard:
+                    return self._hadamard(right_val, backward)
+                rt = right_val.transpose(self._transposeAxes(len(right_val.shape)))
+                return self._matmul(backward, rt)
+            else:
+                left_val = left.getValue()
+                if is_hadamard:
+                    return self._hadamard(left_val, backward)
+                lt = left_val.transpose(self._transposeAxes(len(left_val.shape)))
+                return self._matmul(lt, backward)
+
+        return backward
+
+    def _calculateRMinusY(self, outputNode: Any, classLabelIndex: List[int]) -> None:
+        out_val: Tensor = outputNode.getValue()
+        last_dim = out_val.shape[-1]
+        values: List[float] = []
+        for i, ov in enumerate(out_val.data):
+            if (i % last_dim) == classLabelIndex[i // last_dim]:
+                values.append(1.0 - ov)
+            else:
+                values.append(-ov)
+        outputNode.setBackward(Tensor(values, out_val.shape))
+
+    def backpropagation(self, optimizer: Any, classLabelIndex: List[int]) -> None:
+        sortedNodes = self.topologicalSort()
+        if not sortedNodes:
+            return
+
+        outputNode = sortedNodes.pop(0)
+        self._calculateRMinusY(outputNode, classLabelIndex)
+
+        if sortedNodes:
+            sortedNodes.pop(0).setBackward(outputNode.getBackward())
+
+        while sortedNodes:
+            node = sortedNodes.pop(0)
+            for child in self.nodeMap.get(node, []):
+                deriv = self._calculateDerivative(node, child)
+                if deriv is None:
+                    continue
                 if node.getBackward() is None:
-                    node.setBackward(self.calculateDerivative(node, child))
+                    node.setBackward(deriv)
                 else:
-                    for i in range(node.getBackward().shape[0]):
-                        for j in range(node.getBackward().shape[1]):
-                            node.getBackward().set((i, j), node.getBackward().get((i, j)) + self.calculateDerivative(node, child).get((i, j)))
+                    node.setBackward(node.getBackward() + deriv)
 
-        self.updateValues()
+        optimizer.updateValues(self.nodeMap)
         self.clear()
 
-    def getBiased(self, first: ComputationalNode) -> None:
-        """
-        Add a bias term to the node's value by appending a column of ones.
-        """
-        biased_value = Tensor([[0 for _c in range(first.getValue().shape[1] + 1 )] for _r in range(first.getValue().shape[0])])
-        for i in range(first.getValue().shape[0]):
-            for j in range(first.getValue().shape[1]):
-                biased_value.set([i, j], first.getValue().get([i, j]))
-            biased_value.set([i, first.getValue().shape[1]], 1.0)
-        first.setValue(biased_value)
+    # --- bias handling (matches Java getBiased) ---
+    @staticmethod
+    def _biasTensorValue(t: Tensor) -> Tensor:
+        # Java getBiased(): append 1.0 after each row (last-dimension block).
+        # For 1D, treat as a single row (1, D).
+        if len(t.shape) == 1:
+            t = t.reshape((1, t.shape[0]))
+
+        rows = 1
+        for d in t.shape[:-1]:
+            rows *= d
+        cols = t.shape[-1]
+        new_shape = tuple(t.shape[:-1]) + (cols + 1,)
+
+        out = Tensor([0.0] * _numel(new_shape), new_shape)
+
+        # Copy row by row and set last col to 1.0
+        out_strides = _strides(new_shape)
+        for flat in range(_numel(new_shape)):
+            idx = _unflatten(flat, out_strides)
+            if idx[-1] == cols:
+                out.set(tuple(idx), 1.0)
+            else:
+                out.set(tuple(idx), t.get(tuple(idx)))
+        return out
 
     def predict(self) -> List[int]:
-        """
-        Perform a forward pass and return predicted class indices.
-        """
-        class_labels = self.forwardCalculation()
+        labels = self.forwardCalculation(enableDropout=False)
         self.clear()
-        return class_labels
+        return labels
 
-    def forwardCalculation(self) -> List[int]:
-        """
-        Perform a forward pass through the computational graph.
-        Returns:
-            A list of predicted class indices.
-        """
-        sorted_nodes = self.topologicalSort()
-        output_node = sorted_nodes[0]
+    def forwardCalculationTrain(self) -> List[int]:
+        return self.forwardCalculation(enableDropout=True)
 
-        while len(sorted_nodes) > 1:
-            current_node = sorted_nodes.pop()
-            for child in self.node_map.get(current_node):
-                if child.getValue() == None:
-                    if child.getFunctionType() != None: 
-                        function = None
-                        if child.getFunctionType() == FunctionType.SIGMOID:
-                            function = Sigmoid()
-                        elif child.getFunctionType() == FunctionType.TANH:
-                            function = Tanh()
-                        elif child.getFunctionType() == FunctionType.RELU:
-                            function = ReLU()
-                        elif child.getFunctionType() == FunctionType.SOFTMAX:
-                            function = Softmax()
-                        else:
-                            raise ValueError(f"Unsupported function type: {child.function_type}")
-                        child.setValue(function.calculate(current_node.getValue()))
-                    else:
-                        if current_node.isBiased():
-                            self.getBiased(current_node)
-                        child.setValue(current_node.getValue())
-                else:
-                    if child.getFunctionType() == None:
-                        if child.getOperator() == '*':
-                            if current_node.isBiased():
-                                self.getBiased(current_node)
-                            if child.getValue().shape[1] == current_node.getValue().shape[0]:
-                                child.setValue(child.getValue().multiply(current_node.getValue()))
+    def forwardCalculation(self, enableDropout: bool = True) -> List[int]:
+        sortedNodes = self.topologicalSort()
+        if not sortedNodes:
+            return []
+
+        outputNode = sortedNodes[0]
+        concatenatedNodeMap: Dict[Any, List[Optional[Any]]] = {}
+        counterMap: Dict[Any, int] = {}
+
+        while len(sortedNodes) > 1:
+            current = sortedNodes.pop()
+
+            if current.isBiased():
+                v = current.getValue()
+                if v is None:
+                    raise ValueError("Current node's value is null")
+                current.setValue(self._biasTensorValue(v))
+
+            if current.getValue() is None:
+                raise ValueError("Current node's value is null")
+
+            for child in self.nodeMap.get(current, []):
+                if child.getValue() is None:
+                    func = child.getFunction()
+                    if func is not None:
+                        currentValue = current.getValue()
+                        if self._is_dropout(func):
+                            if enableDropout:
+                                child.setValue(func.calculate(currentValue))
                             else:
-                                child.setValue(current_node.getValue().multiply(child.getValue()))
-                        elif child.getOperator() == '+':
-                            result = child.getValue()
-                            result.add(current_node.getValue())
-                            child.setValue(result)
-                        elif child.operator == '-':
-                            result = child.getValue().clone()
-                            result.subtract(current_node.getValue())
-                            child.setValue(result)
+                                child.setValue(Tensor(list(currentValue.data), currentValue.shape))
                         else:
-                            raise ValueError(f"Unsupported operator: {child.getOperator()}")
+                            child.setValue(func.calculate(currentValue))
+                    else:
+                        if self._is_concatenated_node(child):
+                            parents = self.reverseNodeMap.get(child, [])
+                            if child not in concatenatedNodeMap:
+                                concatenatedNodeMap[child] = [None] * len(parents)
+                            idx = child.getIndex(current)
+                            concatenatedNodeMap[child][idx] = current
+                            counterMap[child] = counterMap.get(child, 0) + 1
+                            if len(parents) == counterMap[child]:
+                                base = concatenatedNodeMap[child][0].getValue()
+                                for i in range(1, len(concatenatedNodeMap[child])):
+                                    base = self._concat(base, concatenatedNodeMap[child][i].getValue(), child.getDimension())
+                                child.setValue(base)
+                        else:
+                            child.setValue(current.getValue())
+                else:
+                    if self._is_multiplication_node(child):
+                        childValue = child.getValue()
+                        currentValue = current.getValue()
+                        if child.isHadamard():
+                            child.setValue(self._hadamard(childValue, currentValue))
+                        elif child.getPriorityNode() != current:
+                            child.setValue(self._matmul(childValue, currentValue))
+                        else:
+                            child.setValue(self._matmul(currentValue, childValue))
+                    else:
+                        child.setValue(child.getValue() + current.getValue())
 
-        class_label_indices = []
-        for i in range(output_node.getValue().shape[0]):
-            max_val = float('-inf')
-            label_index = -1
-            for j in range(output_node.getValue().shape[1]):
-                if (max_val < output_node.getValue().get([i, j])):
-                    max_val = output_node.getValue().get([i, j])
-                    label_index = j
-            class_label_indices.append(label_index)
+        return self.getClassLabels(outputNode)
 
-        return class_label_indices
+    # --- persistence (Java save/loadModel) ---
+    def save(self, fileName: str) -> None:
+        try:
+            with open(fileName, "wb") as f:
+                pickle.dump(self, f)
+        except OSError:
+            print("Object could not be saved.")
+
+    @staticmethod
+    def loadModel(fileName: str) -> Optional["ComputationalGraph"]:
+        try:
+            with open(fileName, "rb") as f:
+                return pickle.load(f)
+        except (OSError, pickle.UnpicklingError):
+            return None
+
+    def _new_computational_node(self, learnable: bool, function: Any, isBiased: bool) -> Any:
+        # operator=None corresponds to Java "function node" or "addition node" (no function)
+        return ComputationalNode(learnable=learnable, function=function, isBiased=isBiased)
+
+    def _new_multiplication_node(self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: Any) -> Any:
+        return MultiplicationNode(learnable=learnable, isBiased=isBiased, isHadamard=isHadamard, priorityNode=priorityNode)
+
+    def _new_concatenated_node(self, dimension: int) -> Any:
+        # Minimal concat-node shim using ComputationalNode plus required methods.
+        node = ComputationalNode(learnable=False, function=None, isBiased=False, operator=None)
+        node._concat_dimension = dimension
+        node._concat_nodes = []
+        node.addNode = lambda n: node._concat_nodes.append(n)
+        node.getDimension = lambda: node._concat_dimension
+        node.getIndex = lambda n: node._concat_nodes.index(n)
+        return node
+
+    def _is_node(self, x: Any) -> bool:
+        return hasattr(x, "getValue") and hasattr(x, "setValue")
+
+    def _is_multiplication_node(self, x: Any) -> bool:
+        return isinstance(x, MultiplicationNode)
+
+    def _new_multiplication_node(self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: Any) -> Any:
+        return MultiplicationNode(
+            learnable=learnable,
+            isBiased=isBiased,
+            isHadamard=isHadamard,
+            priorityNode=priorityNode,
+        )
+
+    @staticmethod
+    def _is_concatenated_node(x: Any) -> bool:
+        return hasattr(x, "getDimension") and hasattr(x, "getIndex")
+
+    @staticmethod
+    def _is_dropout(func: Any) -> bool:
+        return func.__class__.__name__ == "Dropout"
+
+
+def _numel(shape: Tuple[int, ...]) -> int:
+    n = 1
+    for d in shape:
+        n *= int(d)
+    return int(n)
+
+
+def _strides(shape: Tuple[int, ...]) -> Tuple[int, ...]:
+    strides: List[int] = []
+    prod = 1
+    for d in reversed(shape):
+        strides.append(prod)
+        prod *= int(d)
+    return tuple(reversed(strides))
+
+
+def _unflatten(flat_index: int, strides: Tuple[int, ...]) -> List[int]:
+    idx: List[int] = []
+    for s in strides:
+        idx.append(flat_index // s)
+        flat_index %= s
+    return idx

@@ -1,0 +1,66 @@
+from Math.Tensor import Tensor
+
+from ComputationalGraph.ComputationalGraph import ComputationalGraph
+from ComputationalGraph.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Softmax import Softmax
+from ComputationalGraph.StochasticGradientDescent import StochasticGradientDescent
+from ComputationalGraph.NeuralNetworkParameter import NeuralNetworkParameter
+from ComputationalGraph.RandomInitialization import RandomInitialization
+
+
+class _LinearPerceptronSingleUnitGraph(ComputationalGraph):
+    def getClassLabels(self, outputNode):
+        t = outputNode.getValue()
+        last = t.shape[-1]
+        row = t.data[:last]
+        return [max(range(len(row)), key=lambda i: row[i])]
+
+
+def test_cpp_oracle_linear_perceptron_single_unit():
+    # C++: vector<Tensor> trainSet; Tensor([1,1], {2})
+    trainSet = [Tensor([1.0, 1.0], (2,))]
+
+    graph = _LinearPerceptronSingleUnitGraph()
+    params = NeuralNetworkParameter(1, 1, None)
+
+    # C++: Optimizer* optimizer = new StochasticGradientDescent(0.1, 0.99);
+    optimizer = StochasticGradientDescent(0.1, 0.99)
+
+    # C++: input = new MultiplicationNode(false, true); inputNodes.push_back(input);
+    input_node = MultiplicationNode(False, True)
+    graph.inputNodes.append(input_node)
+
+    # C++: weightsTensor shape {3,2} effectively (because biased input)
+    weights = Tensor([1.0, 1.0, 1.0, 1.0, 1.0, 1.0], (3, 2))
+    w = MultiplicationNode(weights)
+
+    # C++: a = addEdge(input, w, false); output = addEdge(a, softmax, false);
+    a = graph.addEdge(input_node, w, isBiased=False)
+    out = graph.addEdge(a, Softmax(), isBiased=False)
+
+    # forward
+    input_node.setValue(trainSet[0])
+    labels = graph.forwardCalculation(enableDropout=False)
+    assert out.getValue() is not None
+    assert labels == [0]  # stable with equal logits under our argmax
+
+    # backprop with class {1} like C++
+    before = list(w.getValue().data)
+    graph.backpropagation(optimizer, [1])
+    after = list(w.getValue().data)
+    assert before != after
+    assert out.getValue() is None  # cleared after backprop like Java
+
+def test_cpp_oracle_linear_perceptron_param_wiring_smoke():
+    # Mirrors C++:
+    # graph.train(trainSet, NeuralNetworkParameter(1, 10, new SGD(0.1,0.99)))
+    # plus initialization used inside train()
+
+    optimizer = StochasticGradientDescent(0.1, 0.99)
+    initialization = RandomInitialization()
+    params = NeuralNetworkParameter(seed=1, epoch=10, optimizer=optimizer, initialization=initialization)
+
+    assert params.getSeed() == 1
+    assert params.getEpoch() == 10
+    assert params.getOptimizer() is optimizer
+    assert params.getInitialization() is initialization
