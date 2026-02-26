@@ -11,6 +11,8 @@ from .StochasticGradientDescent import StochasticGradientDescent
 from .Initialization import Initialization
 from .RandomInitialization import RandomInitialization
 
+from ComputationalGraph.ConcatenatedNode import ConcatenatedNode
+
 from .Softmax import Softmax
 from .Sigmoid import Sigmoid
 from .Tanh import Tanh

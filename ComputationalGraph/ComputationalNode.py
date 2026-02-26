@@ -1,76 +1,115 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Optional
 
 from Math.Tensor import Tensor
 
 
+class NodeType(Enum):
+    COMPUTATIONAL_NODE_TYPE = 0
+    CONCATENATED_NODE_TYPE = 1
+    MULTIPLICATION_NODE_TYPE = 2
+
+
 class ComputationalNode:
     """
-    Java-parity node used by ComputationalGraph.
+    C++ parity for Node/ComputationalNode.{h,cpp}
 
-    Required API:
-      - isLearnable(), isBiased()
-      - getFunction()
-      - getValue()/setValue()
-      - getBackward()/setBackward()
+    Fields:
+      - nodeType
+      - value, backward
+      - learnable, biased
+      - valueNull, backwardNull
+      - function
+
+    Key behavior:
+      - updateValue(): value = value + backward
+      - setValueNull(): value = Tensor({0}), valueNull=True
+      - setBackwardNull(): backward = Tensor({0}), backwardNull=True
     """
 
     def __init__(
         self,
         learnable: bool = False,
-        function: Any = None,
         isBiased: bool = False,
-        operator: Optional[str] = None,
+        function: Any = None,
         value: Optional[Tensor] = None,
+        operator: Optional[str] = None,  # legacy/compat (ignored by core)
+        nodeType: NodeType = NodeType.COMPUTATIONAL_NODE_TYPE,
     ):
-        self._learnable = bool(learnable)
-        self._function = function
-        self._is_biased = bool(isBiased)
-        self.operator = operator  # optional legacy field; kept for debugging/compat
-        self._value: Optional[Tensor] = value
-        self._backward: Optional[Tensor] = None
+        self.nodeType: NodeType = nodeType
+
+        self.learnable: bool = bool(learnable)
+        self.biased: bool = bool(isBiased)
+        self.function: Any = function
+
+        # C++ default Tensor({0}) with null flags set
+        self.value: Tensor = value if value is not None else Tensor([0])
+        self.backward: Tensor = Tensor([0])
+
+        self.valueNull: bool = value is None
+        self.backwardNull: bool = True
+
+        self.operator = operator  # keep for older codepaths
 
     def __hash__(self) -> int:
-        # identity hashing like Java references in HashMap
+        # Use identity-based hashing (like pointers in C++)
         return id(self)
 
-    def __repr__(self) -> str:
-        vs = None if self._value is None else self._value.shape
-        bs = None if self._backward is None else self._backward.shape
-        fn = None if self._function is None else self._function.__class__.__name__
-        return (
-            f"Node(op={self.operator}, learnable={self._learnable}, biased={self._is_biased}, "
-            f"value_shape={vs}, backward_shape={bs}, fn={fn})"
-        )
-
-    # --- Java-style API ---
-    def isLearnable(self) -> bool:
-        return self._learnable
-
-    def setLearnable(self, learnable: bool) -> None:
-        self._learnable = bool(learnable)
-
+    # --- C++ API parity ---
     def isBiased(self) -> bool:
-        return self._is_biased
-
-    def setBiased(self, isBiased: bool) -> None:
-        self._is_biased = bool(isBiased)
+        return self.biased
 
     def getFunction(self) -> Any:
-        return self._function
-
-    def setFunction(self, function: Any) -> None:
-        self._function = function
+        return self.function
 
     def getValue(self) -> Optional[Tensor]:
-        return self._value
+        return None if self.valueNull else self.value
 
     def setValue(self, v: Optional[Tensor]) -> None:
-        self._value = v
+        if v is None:
+            self.setValueNull()
+            return
+        self.value = v
+        self.valueNull = False
+
+    def updateValue(self) -> None:
+        # C++: value = value.add(backward)
+        # Note: optimizer scales backward by learningRate in SGD, then updateValue adds it.
+        if self.valueNull:
+            raise ValueError("updateValue called while valueNull=True")
+        if self.backwardNull:
+            raise ValueError("updateValue called while backwardNull=True")
+        self.value = self.value + self.backward
+        self.valueNull = False
+
+    def isLearnable(self) -> bool:
+        return self.learnable
 
     def getBackward(self) -> Optional[Tensor]:
-        return self._backward
+        return None if self.backwardNull else self.backward
 
     def setBackward(self, b: Optional[Tensor]) -> None:
-        self._backward = b
+        if b is None:
+            self.setBackwardNull()
+            return
+        self.backward = b
+        self.backwardNull = False
+
+    def isValueNull(self) -> bool:
+        return self.valueNull
+
+    def setValueNull(self) -> None:
+        self.value = Tensor([0])
+        self.valueNull = True
+
+    def isBackwardNull(self) -> bool:
+        return self.backwardNull
+
+    def setBackwardNull(self) -> None:
+        self.backward = Tensor([0])
+        self.backwardNull = True
+
+    def getNodeType(self) -> NodeType:
+        return self.nodeType

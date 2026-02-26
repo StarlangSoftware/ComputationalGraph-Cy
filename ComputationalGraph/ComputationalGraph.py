@@ -6,6 +6,7 @@ import pickle
 
 from ComputationalGraph.ComputationalNode import ComputationalNode
 from ComputationalGraph.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.ConcatenatedNode import ConcatenatedNode
 
 from Math.Tensor import Tensor
 
@@ -108,13 +109,25 @@ class ComputationalGraph:
         queue.append(node)  # postorder
         return queue
 
+    def _find_output_node(self, nodes: List[Any]) -> Any:
+        # sink = node with no outgoing edges
+        sinks = [n for n in nodes if (n not in self.nodeMap) or (len(self.nodeMap.get(n, [])) == 0)]
+        return sinks[0] if sinks else nodes[0]
+
+    
     def topologicalSort(self) -> List[Any]:
-        sortedList: List[Any] = []
         visited: Set[Any] = set()
-        for node in list(self.nodeMap.keys()):
+        sortedList: List[Any] = []
+
+        # include keys + children so sinks are also included
+        all_nodes: Set[Any] = set(self.nodeMap.keys())
+        for children in self.nodeMap.values():
+            all_nodes.update(children)
+
+        for node in all_nodes:
             if node not in visited:
-                queue = self._sortRecursive(node, visited)
-                sortedList.extend(queue)
+                sortedList.extend(self._sortRecursive(node, visited))
+
         return sortedList
 
     # --- clear ---
@@ -263,7 +276,7 @@ class ComputationalGraph:
         if not sortedNodes:
             return
 
-        outputNode = sortedNodes.pop(0)
+        outputNode = self._find_output_node(sortedNodes)
         self._calculateRMinusY(outputNode, classLabelIndex)
 
         if sortedNodes:
@@ -322,12 +335,20 @@ class ComputationalGraph:
         if not sortedNodes:
             return []
 
-        outputNode = sortedNodes[0]
+        outputNode = self._find_output_node(sortedNodes)
+                
+
+        # Output node = sink (no outgoing edges). This is robust regardless of topo ordering.
+        sinks = [n for n in sortedNodes if (n not in self.nodeMap) or (len(self.nodeMap.get(n, [])) == 0)]
+        outputNode = sinks[0] if sinks else sortedNodes[0]
+
         concatenatedNodeMap: Dict[Any, List[Optional[Any]]] = {}
         counterMap: Dict[Any, int] = {}
 
-        while len(sortedNodes) > 1:
-            current = sortedNodes.pop()
+        # Process from inputs -> output by iterating reverse topo, skipping the sink itself.
+        for current in reversed(sortedNodes):
+            if current is outputNode:
+                continue
 
             if current.isBiased():
                 v = current.getValue()
@@ -355,10 +376,13 @@ class ComputationalGraph:
                             parents = self.reverseNodeMap.get(child, [])
                             if child not in concatenatedNodeMap:
                                 concatenatedNodeMap[child] = [None] * len(parents)
+
                             idx = child.getIndex(current)
+                            if concatenatedNodeMap[child][idx] is None:
+                                counterMap[child] = counterMap.get(child, 0) + 1
                             concatenatedNodeMap[child][idx] = current
-                            counterMap[child] = counterMap.get(child, 0) + 1
-                            if len(parents) == counterMap[child]:
+
+                            if counterMap.get(child, 0) == len(parents) and all(x is not None for x in concatenatedNodeMap[child]):
                                 base = concatenatedNodeMap[child][0].getValue()
                                 for i in range(1, len(concatenatedNodeMap[child])):
                                     base = self._concat(base, concatenatedNodeMap[child][i].getValue(), child.getDimension())
@@ -401,25 +425,6 @@ class ComputationalGraph:
         return ComputationalNode(learnable=learnable, function=function, isBiased=isBiased)
 
     def _new_multiplication_node(self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: Any) -> Any:
-        return MultiplicationNode(learnable=learnable, isBiased=isBiased, isHadamard=isHadamard, priorityNode=priorityNode)
-
-    def _new_concatenated_node(self, dimension: int) -> Any:
-        # Minimal concat-node shim using ComputationalNode plus required methods.
-        node = ComputationalNode(learnable=False, function=None, isBiased=False, operator=None)
-        node._concat_dimension = dimension
-        node._concat_nodes = []
-        node.addNode = lambda n: node._concat_nodes.append(n)
-        node.getDimension = lambda: node._concat_dimension
-        node.getIndex = lambda n: node._concat_nodes.index(n)
-        return node
-
-    def _is_node(self, x: Any) -> bool:
-        return hasattr(x, "getValue") and hasattr(x, "setValue")
-
-    def _is_multiplication_node(self, x: Any) -> bool:
-        return isinstance(x, MultiplicationNode)
-
-    def _new_multiplication_node(self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: Any) -> Any:
         return MultiplicationNode(
             learnable=learnable,
             isBiased=isBiased,
@@ -427,9 +432,17 @@ class ComputationalGraph:
             priorityNode=priorityNode,
         )
 
-    @staticmethod
-    def _is_concatenated_node(x: Any) -> bool:
-        return hasattr(x, "getDimension") and hasattr(x, "getIndex")
+    def _new_concatenated_node(self, dimension: int) -> Any:
+        return ConcatenatedNode(dimension)
+
+    def _is_node(self, x: Any) -> bool:
+        return hasattr(x, "getValue") and hasattr(x, "setValue")
+
+    def _is_multiplication_node(self, x: Any) -> bool:
+        return isinstance(x, MultiplicationNode)
+
+    def _is_concatenated_node(self, x: Any) -> bool:
+        return isinstance(x, ConcatenatedNode)
 
     @staticmethod
     def _is_dropout(func: Any) -> bool:
