@@ -25,20 +25,32 @@ class NeuralNetwork(ComputationalGraph):
     # ---- Iris instance helpers (mirrors C++ intent) ----
     @staticmethod
     def getLabelIndex(instance: Tensor) -> int:
-        if instance.shape[-1] != 5:
-            raise ValueError(f"Expected iris instance shape (5,), got {instance.shape}")
-        # last entry is label index
-        return int(instance.data[4])
+        if len(instance.shape) != 1 or instance.shape[-1] < 2:
+            raise ValueError(f"Expected a 1D instance tensor with feature(s)+label, got {instance.shape}")
+        return int(instance.data[-1])
 
     @staticmethod
     def createInputTensor(instance: Tensor) -> Tensor:
         """
         C++ declares: Tensor createInputTensor(const Tensor& instance);
-        Here: return features only (4 floats), drop the label.
+        Return features only, dropping the last entry which is the label.
         """
-        if instance.shape[-1] != 5:
-            raise ValueError(f"Expected iris instance shape (5,), got {instance.shape}")
-        return Tensor([float(instance.data[0]), float(instance.data[1]), float(instance.data[2]), float(instance.data[3])], (4,))
+        if len(instance.shape) != 1 or instance.shape[-1] < 2:
+            raise ValueError(f"Expected a 1D instance tensor with feature(s)+label, got {instance.shape}")
+        size = int(instance.shape[-1]) - 1
+        return Tensor([float(v) for v in instance.data[:size]], (size,))
+
+    def test(self, testSet: List[Tensor]) -> float:
+        count = 0
+        total = 0
+        for instance in testSet:
+            self.inputNodes[0].setValue(self.createInputTensor(instance))
+            output = self.predict()
+            class_label = output[0]
+            if class_label == self.getLabelIndex(instance):
+                count += 1
+            total += 1
+        return (count + 0.0) / total if total > 0 else 0.0
 
     # ---- Output decoding (generic, used by tests + future models) ----
     def getClassLabels(self, outputNode) -> List[int]:

@@ -1,7 +1,11 @@
 from Math.Tensor import Tensor
 
 from ComputationalGraph.ComputationalGraph import ComputationalGraph
+from ComputationalGraph.DeepNetwork import DeepNetwork
+from ComputationalGraph.LinearPerceptron import LinearPerceptron
+from ComputationalGraph.LinearPerceptronSingleUnit import LinearPerceptronSingleUnit
 from ComputationalGraph.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.MultiLayerPerceptron import MultiLayerPerceptron
 from ComputationalGraph.Softmax import Softmax
 from ComputationalGraph.StochasticGradientDescent import StochasticGradientDescent
 from ComputationalGraph.NeuralNetworkParameter import NeuralNetworkParameter
@@ -64,3 +68,55 @@ def test_cpp_oracle_linear_perceptron_param_wiring_smoke():
     assert params.getEpoch() == 10
     assert params.getOptimizer() is optimizer
     assert params.getInitialization() is initialization
+
+
+def test_cpp_oracle_linear_perceptron_single_unit_train_smoke():
+    graph = LinearPerceptronSingleUnit()
+    train_set = [Tensor([1.0, 1.0], (2,))]
+    graph.train(train_set, NeuralNetworkParameter(1, 1, None))
+    assert len(graph.inputNodes) == 1
+
+
+def test_cpp_oracle_linear_perceptron_train_and_test_smoke():
+    graph = LinearPerceptron()
+    train_set, test_set = [], []
+    graph.createIrisDataset(train_set, test_set, seed=1)
+    params = NeuralNetworkParameter(
+        seed=1,
+        epoch=2,
+        optimizer=StochasticGradientDescent(0.1, 0.99),
+        initialization=RandomInitialization(),
+    )
+    graph.train(train_set, params)
+    acc = graph.test(test_set)
+    assert 0.0 <= acc <= 1.0
+
+
+def test_cpp_oracle_multilayer_perceptron_train_and_test_smoke():
+    graph = MultiLayerPerceptron()
+    train_set, test_set = [], []
+    graph.createIrisDataset(train_set, test_set, seed=1)
+    params = NeuralNetworkParameter(
+        seed=1,
+        epoch=2,
+        optimizer=StochasticGradientDescent(0.1, 0.99),
+        initialization=RandomInitialization(),
+    )
+    graph.train(train_set, params)
+    acc = graph.test(test_set)
+    assert 0.0 <= acc <= 1.0
+
+
+def test_cpp_oracle_deep_network_train_and_test_smoke():
+    graph = DeepNetwork()
+    train_set, test_set = [], []
+    graph.createIrisDataset(train_set, test_set, seed=1)
+    params = NeuralNetworkParameter(
+        seed=1,
+        epoch=2,
+        optimizer=StochasticGradientDescent(0.1, 0.99),
+        initialization=RandomInitialization(),
+    )
+    graph.train(train_set, params)
+    acc = graph.test(test_set)
+    assert 0.0 <= acc <= 1.0
