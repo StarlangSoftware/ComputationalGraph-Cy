@@ -3,8 +3,8 @@ from __future__ import annotations
 from Math.Tensor import Tensor
 
 from ComputationalGraph.ComputationalGraph import ComputationalGraph
-from ComputationalGraph.MultiplicationNode import MultiplicationNode
-from ComputationalGraph.Softmax import Softmax
+from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Function.Softmax import Softmax
 
 
 class _InvGraph(ComputationalGraph):

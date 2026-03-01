@@ -2,10 +2,10 @@ import random
 
 from Math.Tensor import Tensor
 
-from ComputationalGraph.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
 from ComputationalGraph.NeuralNetwork import NeuralNetwork
-from ComputationalGraph.Sigmoid import Sigmoid
-from ComputationalGraph.Softmax import Softmax
+from ComputationalGraph.Function.Sigmoid import Sigmoid
+from ComputationalGraph.Function.Softmax import Softmax
 
 
 class MultiLayerPerceptron(NeuralNetwork):

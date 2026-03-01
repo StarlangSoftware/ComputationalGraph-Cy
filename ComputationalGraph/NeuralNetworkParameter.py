@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from ComputationalGraph.RandomInitialization import RandomInitialization
+from ComputationalGraph.Initialization.RandomInitialization import RandomInitialization
 
 
 @dataclass

@@ -1,6 +1,6 @@
 from ComputationalGraph.ComputationalGraph import ComputationalGraph
-from ComputationalGraph.MultiplicationNode import MultiplicationNode
-from ComputationalGraph.ComputationalNode import ComputationalNode
+from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Node.ComputationalNode import ComputationalNode
 from Math.Tensor import Tensor
 
 def test_type_guards_exist_and_work():

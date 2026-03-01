@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 import pickle
 
-from ComputationalGraph.ComputationalNode import ComputationalNode
-from ComputationalGraph.MultiplicationNode import MultiplicationNode
-from ComputationalGraph.ConcatenatedNode import ConcatenatedNode
+from ComputationalGraph.Node.ComputationalNode import ComputationalNode
+from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Node.ConcatenatedNode import ConcatenatedNode
 
 from Math.Tensor import Tensor
 

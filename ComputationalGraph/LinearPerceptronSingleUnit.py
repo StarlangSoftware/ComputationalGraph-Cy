@@ -1,9 +1,9 @@
 from Math.Tensor import Tensor
 
-from ComputationalGraph.MultiplicationNode import MultiplicationNode
+from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
 from ComputationalGraph.NeuralNetwork import NeuralNetwork
-from ComputationalGraph.Softmax import Softmax
-from ComputationalGraph.StochasticGradientDescent import StochasticGradientDescent
+from ComputationalGraph.Function.Softmax import Softmax
+from ComputationalGraph.Optimizer.StochasticGradientDescent import StochasticGradientDescent
 
 
 class LinearPerceptronSingleUnit(NeuralNetwork):

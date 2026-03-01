@@ -1,6 +1,6 @@
 from .ComputationalGraph import ComputationalGraph
-from .ComputationalNode import ComputationalNode
-from .MultiplicationNode import MultiplicationNode
+from .Node.ComputationalNode import ComputationalNode
+from .Node.MultiplicationNode import MultiplicationNode
 
 from .NeuralNetwork import NeuralNetwork
 from .LinearPerceptron import LinearPerceptron
@@ -9,24 +9,24 @@ from .DeepNetwork import DeepNetwork
 from .LinearPerceptronSingleUnit import LinearPerceptronSingleUnit
 from .NeuralNetworkParameter import NeuralNetworkParameter
 
-from .Optimizer import Optimizer
-from .StochasticGradientDescent import StochasticGradientDescent
+from .Optimizer.Optimizer import Optimizer
+from .Optimizer.StochasticGradientDescent import StochasticGradientDescent
 
-from .Initialization import Initialization
-from .RandomInitialization import RandomInitialization
-from .HeUniformInitialization import HeUniformInitialization
-from .UniformXavierInitialization import UniformXavierInitialization
+from .Initialization.Initialization import Initialization
+from .Initialization.RandomInitialization import RandomInitialization
+from .Initialization.HeUniformInitialization import HeUniformInitialization
+from .Initialization.UniformXavierInitialization import UniformXavierInitialization
 
-from ComputationalGraph.ConcatenatedNode import ConcatenatedNode
+from .Node.ConcatenatedNode import ConcatenatedNode
 
-from .Softmax import Softmax
-from .Sigmoid import Sigmoid
-from .Tanh import Tanh
-from .ReLU import ReLU
-from .ELU import ELU
-from .DELU import DELU
-from .Negation import Negation
-from .Dropout import Dropout
-from .SGDMomentum import SGDMomentum
-from .Adam import Adam
-from .AdamW import AdamW
+from .Function.Softmax import Softmax
+from .Function.Sigmoid import Sigmoid
+from .Function.Tanh import Tanh
+from .Function.ReLU import ReLU
+from .Function.ELU import ELU
+from .Function.DELU import DELU
+from .Function.Negation import Negation
+from .Function.Dropout import Dropout
+from .Optimizer.SGDMomentum import SGDMomentum
+from .Optimizer.Adam import Adam
+from .Optimizer.AdamW import AdamW
