@@ -3,10 +3,6 @@ from .Node.ComputationalNode import ComputationalNode
 from .Node.MultiplicationNode import MultiplicationNode
 
 from .NeuralNetwork import NeuralNetwork
-from .LinearPerceptron import LinearPerceptron
-from .MultiLayerPerceptron import MultiLayerPerceptron
-from .DeepNetwork import DeepNetwork
-from .LinearPerceptronSingleUnit import LinearPerceptronSingleUnit
 from .NeuralNetworkParameter import NeuralNetworkParameter
 
 from .Optimizer.Optimizer import Optimizer

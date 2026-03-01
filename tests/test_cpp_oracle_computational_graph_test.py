@@ -1,15 +1,15 @@
 from Math.Tensor import Tensor
 
 from ComputationalGraph.ComputationalGraph import ComputationalGraph
-from ComputationalGraph.DeepNetwork import DeepNetwork
-from ComputationalGraph.LinearPerceptron import LinearPerceptron
-from ComputationalGraph.LinearPerceptronSingleUnit import LinearPerceptronSingleUnit
 from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
-from ComputationalGraph.MultiLayerPerceptron import MultiLayerPerceptron
 from ComputationalGraph.Function.Softmax import Softmax
 from ComputationalGraph.NeuralNetworkParameter import NeuralNetworkParameter
 from ComputationalGraph.Initialization.RandomInitialization import RandomInitialization
 from ComputationalGraph.Optimizer.StochasticGradientDescent import StochasticGradientDescent
+from tests.deep_network import DeepNetwork
+from tests.linear_perceptron import LinearPerceptron
+from tests.linear_perceptron_single_unit import LinearPerceptronSingleUnit
+from tests.multi_layer_perceptron import MultiLayerPerceptron
 
 
 class _LinearPerceptronSingleUnitGraph(ComputationalGraph):
