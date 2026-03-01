@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 from Math.Tensor import Tensor
+from ComputationalGraph.types import FunctionLike
 
 
 class NodeType(Enum):
@@ -33,7 +34,7 @@ class ComputationalNode:
         self,
         learnable: bool = False,
         isBiased: bool = False,
-        function: Any = None,
+        function: FunctionLike | None = None,
         value: Optional[Tensor] = None,
         operator: Optional[str] = None,  # legacy/compat (ignored by core)
         nodeType: NodeType = NodeType.COMPUTATIONAL_NODE_TYPE,
@@ -42,7 +43,7 @@ class ComputationalNode:
 
         self.learnable: bool = bool(learnable)
         self.biased: bool = bool(isBiased)
-        self.function: Any = function
+        self.function: FunctionLike | None = function
 
         # C++ default Tensor({0}) with null flags set
         self.value: Tensor = value if value is not None else Tensor([0])
@@ -61,7 +62,7 @@ class ComputationalNode:
     def isBiased(self) -> bool:
         return self.biased
 
-    def getFunction(self) -> Any:
+    def getFunction(self) -> FunctionLike | None:
         return self.function
 
     def getValue(self) -> Optional[Tensor]:

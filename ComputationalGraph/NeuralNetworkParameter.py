@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
 
 from ComputationalGraph.Initialization.RandomInitialization import RandomInitialization
+from ComputationalGraph.types import InitializationLike, OptimizerLike
 
 
 @dataclass
 class NeuralNetworkParameter:
     seed: int
     epoch: int
-    optimizer: Optional[Any] = None
-    initialization: Optional[Any] = None
+    optimizer: OptimizerLike | None = None
+    initialization: InitializationLike | None = None
     dropout: float = 0.0
 
     def __post_init__(self) -> None:
@@ -24,10 +24,10 @@ class NeuralNetworkParameter:
     def getEpoch(self) -> int:
         return int(self.epoch)
 
-    def getOptimizer(self) -> Optional[Any]:
+    def getOptimizer(self) -> OptimizerLike | None:
         return self.optimizer
 
-    def getInitialization(self) -> Optional[Any]:
+    def getInitialization(self) -> InitializationLike | None:
         return self.initialization
 
     def getDropout(self) -> float:

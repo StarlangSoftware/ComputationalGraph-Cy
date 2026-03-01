@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 import pickle
 
 from ComputationalGraph.Node.ComputationalNode import ComputationalNode
 from ComputationalGraph.Node.MultiplicationNode import MultiplicationNode
 from ComputationalGraph.Node.ConcatenatedNode import ConcatenatedNode
+from ComputationalGraph.types import FunctionLike, GraphNode, OptimizerLike
 
 from Math.Tensor import Tensor
 
@@ -24,26 +24,26 @@ class ComputationalGraph:
     """
 
     def __init__(self) -> None:
-        self.nodeMap: Dict[Any, List[Any]] = {}
-        self.reverseNodeMap: Dict[Any, List[Any]] = {}
-        self.inputNodes: List[Any] = []
+        self.nodeMap: Dict[GraphNode, List[GraphNode]] = {}
+        self.reverseNodeMap: Dict[GraphNode, List[GraphNode]] = {}
+        self.inputNodes: List[GraphNode] = []
 
     # --- abstract surface (mirrors Java) ---
-    def train(self, trainSet: List[Tensor], parameters: Any) -> None:
+    def train(self, trainSet: List[Tensor], parameters) -> None:
         raise NotImplementedError
 
-    def test(self, testSet: List[Tensor]) -> Any:
+    def test(self, testSet: List[Tensor]):
         raise NotImplementedError
 
-    def getClassLabels(self, outputNode: Any) -> List[int]:
+    def getClassLabels(self, outputNode: GraphNode) -> List[int]:
         raise NotImplementedError
 
     # --- graph wiring ---
-    def _link(self, parent: Any, child: Any) -> None:
+    def _link(self, parent: GraphNode, child: GraphNode) -> None:
         self.nodeMap.setdefault(parent, []).append(child)
         self.reverseNodeMap.setdefault(child, []).append(parent)
 
-    def addEdge(self, first: Any, second: Any, isBiased: bool) -> Any:
+    def addEdge(self, first: GraphNode, second: FunctionLike | GraphNode, isBiased: bool) -> GraphNode:
         """
         Java: addEdge(ComputationalNode first, Object second, boolean isBiased)
 
@@ -73,7 +73,7 @@ class ComputationalGraph:
 
         raise ValueError("Illegal Type of Object: second")
 
-    def addEdgeMul(self, first: Any, second: Any, isBiased: bool, isHadamard: bool) -> Any:
+    def addEdgeMul(self, first: GraphNode, second: GraphNode, isBiased: bool, isHadamard: bool) -> GraphNode:
         """Java: addEdge(first, second, isBiased, isHadamard)."""
         newNode = self._new_multiplication_node(
             learnable=False, isBiased=isBiased, isHadamard=isHadamard, priorityNode=first
@@ -82,14 +82,14 @@ class ComputationalGraph:
         self._link(second, newNode)
         return newNode
 
-    def addAdditionEdge(self, first: Any, second: Any, isBiased: bool) -> Any:
+    def addAdditionEdge(self, first: GraphNode, second: GraphNode, isBiased: bool) -> GraphNode:
         """Java: addAdditionEdge(...) creates a plain node with no function."""
         newNode = self._new_computational_node(learnable=False, function=None, isBiased=isBiased)
         self._link(first, newNode)
         self._link(second, newNode)
         return newNode
 
-    def concatEdges(self, nodes: List[Any], dimension: int) -> Any:
+    def concatEdges(self, nodes: List[GraphNode], dimension: int) -> GraphNode:
         """Java: creates ConcatenatedNode(dimension) and links all inputs to it."""
         newNode = self._new_concatenated_node(dimension=dimension)
         for n in nodes:
@@ -99,8 +99,8 @@ class ComputationalGraph:
         return newNode
 
     # --- topo sort ---
-    def _sortRecursive(self, node: Any, visited: Set[Any]) -> List[Any]:
-        queue: List[Any] = []
+    def _sortRecursive(self, node: GraphNode, visited: Set[GraphNode]) -> List[GraphNode]:
+        queue: List[GraphNode] = []
         visited.add(node)
         if node in self.nodeMap:
             for child in self.nodeMap[node]:
@@ -109,18 +109,18 @@ class ComputationalGraph:
         queue.append(node)  # postorder
         return queue
 
-    def _find_output_node(self, nodes: List[Any]) -> Any:
+    def _find_output_node(self, nodes: List[GraphNode]) -> GraphNode:
         # sink = node with no outgoing edges
         sinks = [n for n in nodes if (n not in self.nodeMap) or (len(self.nodeMap.get(n, [])) == 0)]
         return sinks[0] if sinks else nodes[0]
 
     
-    def topologicalSort(self) -> List[Any]:
-        visited: Set[Any] = set()
-        sortedList: List[Any] = []
+    def topologicalSort(self) -> List[GraphNode]:
+        visited: Set[GraphNode] = set()
+        sortedList: List[GraphNode] = []
 
         # include keys + children so sinks are also included
-        all_nodes: Set[Any] = set(self.nodeMap.keys())
+        all_nodes: Set[GraphNode] = set(self.nodeMap.keys())
         for children in self.nodeMap.values():
             all_nodes.update(children)
 
@@ -131,7 +131,7 @@ class ComputationalGraph:
         return sortedList
 
     # --- clear ---
-    def _clearRecursive(self, visited: Set[Any], node: Any) -> None:
+    def _clearRecursive(self, visited: Set[GraphNode], node: GraphNode) -> None:
         visited.add(node)
         if hasattr(node, "isLearnable") and not node.isLearnable():
             if hasattr(node, "setValue"):
@@ -144,7 +144,7 @@ class ComputationalGraph:
                     self._clearRecursive(visited, child)
 
     def clear(self) -> None:
-        visited: Set[Any] = set()
+        visited: Set[GraphNode] = set()
         for node in list(self.nodeMap.keys()):
             if node not in visited:
                 self._clearRecursive(visited, node)
@@ -201,7 +201,7 @@ class ComputationalGraph:
         return out
 
     # --- backprop core ---
-    def _calculateDerivative(self, node: Any, child: Any) -> Optional[Tensor]:
+    def _calculateDerivative(self, node: GraphNode, child: GraphNode) -> Optional[Tensor]:
         reverseParents = self.reverseNodeMap.get(child)
         if not reverseParents:
             return None
@@ -260,7 +260,7 @@ class ComputationalGraph:
 
         return backward
 
-    def _calculateRMinusY(self, outputNode: Any, classLabelIndex: List[int]) -> None:
+    def _calculateRMinusY(self, outputNode: GraphNode, classLabelIndex: List[int]) -> None:
         out_val: Tensor = outputNode.getValue()
         last_dim = out_val.shape[-1]
         values: List[float] = []
@@ -271,7 +271,7 @@ class ComputationalGraph:
                 values.append(-ov)
         outputNode.setBackward(Tensor(values, out_val.shape))
 
-    def backpropagation(self, optimizer: Any, classLabelIndex: List[int]) -> None:
+    def backpropagation(self, optimizer: OptimizerLike, classLabelIndex: List[int]) -> None:
         sortedNodes = self.topologicalSort()
         if not sortedNodes:
             return
@@ -342,8 +342,8 @@ class ComputationalGraph:
         sinks = [n for n in sortedNodes if (n not in self.nodeMap) or (len(self.nodeMap.get(n, [])) == 0)]
         outputNode = sinks[0] if sinks else sortedNodes[0]
 
-        concatenatedNodeMap: Dict[Any, List[Optional[Any]]] = {}
-        counterMap: Dict[Any, int] = {}
+        concatenatedNodeMap: Dict[ConcatenatedNode, List[Optional[GraphNode]]] = {}
+        counterMap: Dict[ConcatenatedNode, int] = {}
 
         # Process from inputs -> output by iterating reverse topo, skipping the sink itself.
         for current in reversed(sortedNodes):
@@ -420,11 +420,13 @@ class ComputationalGraph:
         except (OSError, pickle.UnpicklingError):
             return None
 
-    def _new_computational_node(self, learnable: bool, function: Any, isBiased: bool) -> Any:
+    def _new_computational_node(self, learnable: bool, function: FunctionLike | None, isBiased: bool) -> ComputationalNode:
         # operator=None corresponds to Java "function node" or "addition node" (no function)
         return ComputationalNode(learnable=learnable, function=function, isBiased=isBiased)
 
-    def _new_multiplication_node(self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: Any) -> Any:
+    def _new_multiplication_node(
+        self, learnable: bool, isBiased: bool, isHadamard: bool, priorityNode: GraphNode
+    ) -> MultiplicationNode:
         return MultiplicationNode(
             learnable=learnable,
             isBiased=isBiased,
@@ -432,20 +434,20 @@ class ComputationalGraph:
             priorityNode=priorityNode,
         )
 
-    def _new_concatenated_node(self, dimension: int) -> Any:
+    def _new_concatenated_node(self, dimension: int) -> ConcatenatedNode:
         return ConcatenatedNode(dimension)
 
-    def _is_node(self, x: Any) -> bool:
+    def _is_node(self, x: object) -> bool:
         return hasattr(x, "getValue") and hasattr(x, "setValue")
 
-    def _is_multiplication_node(self, x: Any) -> bool:
+    def _is_multiplication_node(self, x: object) -> bool:
         return isinstance(x, MultiplicationNode)
 
-    def _is_concatenated_node(self, x: Any) -> bool:
+    def _is_concatenated_node(self, x: object) -> bool:
         return isinstance(x, ConcatenatedNode)
 
     @staticmethod
-    def _is_dropout(func: Any) -> bool:
+    def _is_dropout(func: object) -> bool:
         return func.__class__.__name__ == "Dropout"
 
 
