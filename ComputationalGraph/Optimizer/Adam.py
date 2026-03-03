@@ -8,6 +8,16 @@ from .SGDMomentum import SGDMomentum
 
 class Adam(SGDMomentum):
     def __init__(self, learningRate: float, etaDecrease: float, beta1: float, beta2: float, epsilon: float):
+        """
+        Creates an Adam optimizer.
+
+        @param learningRate Initial learning rate.
+        @param etaDecrease Multiplicative decay factor.
+        @param beta1 First-moment decay factor.
+        @param beta2 Second-moment decay factor.
+        @param epsilon Numerical stability constant.
+        @return None.
+        """
         super().__init__(learningRate, etaDecrease, beta1)
         self.beta2 = float(beta2)
         self.epsilon = float(epsilon)
@@ -16,6 +26,12 @@ class Adam(SGDMomentum):
         self.momentumMap: dict[ComputationalNode, list[float]] = {}
 
     def calculate(self, node: ComputationalNode) -> list[float]:
+        """
+        Computes Adam gradients for the given node.
+
+        @param node Learnable node whose gradients will be computed.
+        @return Gradient list after Adam adjustment.
+        """
         backward = node.getBackward().data
         new_momentum = [(1.0 - self.momentum) * float(v) for v in backward]
         new_velocity = [(1.0 - self.beta2) * float(v) * float(v) for v in backward]
@@ -39,10 +55,22 @@ class Adam(SGDMomentum):
         ]
 
     def setGradients(self, node: ComputationalNode) -> None:
+        """
+        Sets Adam-adjusted gradients for the given node.
+
+        @param node Learnable node whose gradients will be updated.
+        @return None.
+        """
         gradients = self.calculate(node)
         node.setBackward(Tensor(gradients, node.getBackward().shape))
 
     def updateValues(self, nodeMap) -> None:
+        """
+        Updates the bias-correction state and applies optimizer updates.
+
+        @param nodeMap Graph adjacency map.
+        @return None.
+        """
         self.currentBeta1 *= self.momentum
         self.currentBeta2 *= self.beta2
         super().updateValues(nodeMap)

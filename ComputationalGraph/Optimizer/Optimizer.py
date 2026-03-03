@@ -8,6 +8,12 @@ from ComputationalGraph.Node.ComputationalNode import ComputationalNode
 
 
 def _numel(shape: tuple[int, ...]) -> int:
+    """
+    Computes the number of elements in a tensor shape.
+
+    @param shape Tensor shape.
+    @return Total number of elements.
+    """
     n = 1
     for d in shape:
         n *= int(d)
@@ -15,6 +21,12 @@ def _numel(shape: tuple[int, ...]) -> int:
 
 
 def _strides(shape: tuple[int, ...]) -> tuple[int, ...]:
+    """
+    Computes row-major strides for the given shape.
+
+    @param shape Tensor shape.
+    @return Stride tuple.
+    """
     strides: List[int] = []
     prod = 1
     for d in reversed(shape):
@@ -24,6 +36,13 @@ def _strides(shape: tuple[int, ...]) -> tuple[int, ...]:
 
 
 def _unflatten(flat_index: int, strides: tuple[int, ...]) -> List[int]:
+    """
+    Converts a flat index to a multidimensional index.
+
+    @param flat_index Flat index.
+    @param strides Tensor strides.
+    @return Multidimensional index.
+    """
     idx: List[int] = []
     for s in strides:
         idx.append(flat_index // s)
@@ -32,28 +51,53 @@ def _unflatten(flat_index: int, strides: tuple[int, ...]) -> List[int]:
 
 
 def _ravel_index(idx: List[int], strides: tuple[int, ...]) -> int:
+    """
+    Converts a multidimensional index to a flat index.
+
+    @param idx Multidimensional index.
+    @param strides Tensor strides.
+    @return Flat index.
+    """
     return sum(i * s for i, s in zip(idx, strides))
 
 
 class Optimizer(ABC):
     def __init__(self, learningRate: float, etaDecrease: float):
+        """
+        Creates an optimizer with the given learning rate schedule.
+
+        @param learningRate Initial learning rate.
+        @param etaDecrease Multiplicative decay factor.
+        @return None.
+        """
         self.learningRate = float(learningRate)
         self.etaDecrease = float(etaDecrease)
 
     def setLearningRate(self) -> None:
+        """
+        Updates the learning rate by the decay factor.
+
+        @return None.
+        """
         # C++: learningRate *= etaDecrease
         self.learningRate *= self.etaDecrease
 
     @abstractmethod
     def setGradients(self, node: ComputationalNode) -> None:
+        """
+        Sets the gradients of the given learnable node according to the optimizer rule.
+
+        @param node Learnable node whose gradients will be updated.
+        @return None.
+        """
         ...
 
     def broadcast(self, node: ComputationalNode) -> int:
         """
-        C++ parity:
-        Return the index of the only dimension where:
-          value_shape[i] != backward_shape[i] and value_shape[i] == 1
-        Else return -1 (no broadcast or ambiguous).
+        Checks whether broadcasting reduction is needed for the given node.
+
+        @param node Learnable node.
+        @return Broadcast dimension index, or -1 if no reduction is needed.
         """
         v = node.getValue().shape
         b = node.getBackward().shape
@@ -68,8 +112,11 @@ class Optimizer(ABC):
 
     def _reduce_backward_to_value_shape(self, node: ComputationalNode, axis: int) -> None:
         """
-        Safer Python implementation of the C++ broadcast reduction:
-        sums backward over the broadcasted axis into shape(value).
+        Reduces the backward tensor to the node value shape along the given axis.
+
+        @param node Learnable node.
+        @param axis Broadcast axis.
+        @return None.
         """
         v_shape = tuple(node.getValue().shape)
         b_tensor: Tensor = node.getBackward()
@@ -95,6 +142,14 @@ class Optimizer(ABC):
         node: ComputationalNode,
         nodeMap: Dict[ComputationalNode, List[ComputationalNode]],
     ) -> None:
+        """
+        Recursively updates learnable nodes reachable from the given node.
+
+        @param visited Set of visited nodes.
+        @param node Current node.
+        @param nodeMap Graph adjacency map.
+        @return None.
+        """
         visited.add(node)
 
         if node.isLearnable():
@@ -111,6 +166,12 @@ class Optimizer(ABC):
                     self.updateRecursive(visited, child, nodeMap)
 
     def updateValues(self, nodeMap: Dict[ComputationalNode, List[ComputationalNode]]) -> None:
+        """
+        Updates all learnable node values in the graph.
+
+        @param nodeMap Graph adjacency map.
+        @return None.
+        """
         visited: Set[ComputationalNode] = set()
         nodes = list(nodeMap.keys())
         for node in nodes:
