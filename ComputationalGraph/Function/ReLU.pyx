@@ -1,3 +1,5 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
+
 from .Function import Function
 from Math.Tensor import Tensor
 
@@ -14,7 +16,13 @@ class ReLU(Function):
         @param value The tensor whose values are to be transformed.
         @return ReLU(x).
         """
-        out = [max(0.0, float(v)) for v in value.data]
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double x
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            x = float(value.data[i])
+            out[i] = x if x > 0.0 else 0.0
         return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
@@ -25,7 +33,11 @@ class ReLU(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        out = []
-        for i, val in enumerate(value.data):
-            out.append(float(backward.data[i]) if float(val) > 0.0 else 0.0)
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double val
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            val = float(value.data[i])
+            out[i] = float(backward.data[i]) if val > 0.0 else 0.0
         return Tensor(out, value.shape)

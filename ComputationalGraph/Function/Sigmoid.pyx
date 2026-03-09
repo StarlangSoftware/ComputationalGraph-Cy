@@ -1,4 +1,6 @@
-import math
+# cython: language_level=3, boundscheck=False, wraparound=False
+
+from libc.math cimport exp
 
 from .Function import Function
 from Math.Tensor import Tensor
@@ -16,7 +18,13 @@ class Sigmoid(Function):
         @param value The tensor whose values are to be transformed.
         @return Sigmoid(x).
         """
-        out = [1.0 / (1.0 + math.exp(-float(v))) for v in value.data]
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double x
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            x = float(value.data[i])
+            out[i] = 1.0 / (1.0 + exp(-x))
         return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
@@ -27,7 +35,11 @@ class Sigmoid(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        out = []
-        for i, val in enumerate(value.data):
-            out.append(float(backward.data[i]) * float(val) * (1.0 - float(val)))
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double val
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            val = float(value.data[i])
+            out[i] = float(backward.data[i]) * val * (1.0 - val)
         return Tensor(out, value.shape)

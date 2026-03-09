@@ -1918,13 +1918,6 @@ static PyObject *__Pyx__GetModuleGlobalName(PyObject *name, PY_UINT64_T *dict_ve
 static CYTHON_INLINE PyObject *__Pyx__GetModuleGlobalName(PyObject *name);
 #endif
 
-/* PyObjectFastCallMethod.proto */
-#if CYTHON_VECTORCALL && PY_VERSION_HEX >= 0x03090000
-#define __Pyx_PyObject_FastCallMethod(name, args, nargsf) PyObject_VectorcallMethod(name, args, nargsf, NULL)
-#else
-static PyObject *__Pyx_PyObject_FastCallMethod(PyObject *name, PyObject *const *args, size_t nargsf);
-#endif
-
 /* PyFloatBinop.proto */
 #if !CYTHON_COMPILING_IN_PYPY
 static PyObject* __Pyx_PyFloat_TrueDivideCObj(PyObject *op1, PyObject *op2, double floatval, int inplace, int zerodivision_check);
@@ -1941,42 +1934,24 @@ static PyObject* __Pyx_PyFloat_SubtractCObj(PyObject *op1, PyObject *op2, double
     (inplace ? PyNumber_InPlaceSubtract(op1, op2) : PyNumber_Subtract(op1, op2))
 #endif
 
-/* ListAppend.proto (used by append) */
-#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
-static CYTHON_INLINE int __Pyx_PyList_Append(PyObject* list, PyObject* x) {
-    PyListObject* L = (PyListObject*) list;
-    Py_ssize_t len = Py_SIZE(list);
-    if (likely(L->allocated > len) & likely(len > (L->allocated >> 1))) {
-        Py_INCREF(x);
-        #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030d0000
-        L->ob_item[len] = x;
-        #else
-        PyList_SET_ITEM(list, len, x);
-        #endif
-        __Pyx_SET_SIZE(list, len + 1);
-        return 0;
-    }
-    return PyList_Append(list, x);
-}
+/* PyObjectFastCallMethod.proto */
+#if CYTHON_VECTORCALL && PY_VERSION_HEX >= 0x03090000
+#define __Pyx_PyObject_FastCallMethod(name, args, nargsf) PyObject_VectorcallMethod(name, args, nargsf, NULL)
 #else
-#define __Pyx_PyList_Append(L,x) PyList_Append(L,x)
+static PyObject *__Pyx_PyObject_FastCallMethod(PyObject *name, PyObject *const *args, size_t nargsf);
 #endif
 
-/* PyObjectCall2Args.proto (used by PyObjectCallMethod1) */
-static CYTHON_INLINE PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
+/* SetItemInt.proto */
+#define __Pyx_SetItemInt(o, i, v, type, is_signed, to_py_func, is_list, wraparound, boundscheck, has_gil, unsafe_shared)\
+    (__Pyx_fits_Py_ssize_t(i, type, is_signed) ?\
+    __Pyx_SetItemInt_Fast(o, (Py_ssize_t)i, v, is_list, wraparound, boundscheck, unsafe_shared) :\
+    (is_list ? (PyErr_SetString(PyExc_IndexError, "list assignment index out of range"), -1) :\
+               __Pyx_SetItemInt_Generic(o, to_py_func(i), v)))
+static int __Pyx_SetItemInt_Generic(PyObject *o, PyObject *j, PyObject *v);
+static CYTHON_INLINE int __Pyx_SetItemInt_Fast(PyObject *o, Py_ssize_t i, PyObject *v,
+                                               int is_list, int wraparound, int boundscheck, int unsafe_shared);
 
-/* PyObjectGetMethod.proto (used by PyObjectCallMethod1) */
-#if !(CYTHON_VECTORCALL && (__PYX_LIMITED_VERSION_HEX >= 0x030C0000 || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX >= 0x03090000)))
-static int __Pyx_PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method);
-#endif
-
-/* PyObjectCallMethod1.proto (used by append) */
-static PyObject* __Pyx_PyObject_CallMethod1(PyObject* obj, PyObject* method_name, PyObject* arg);
-
-/* append.proto */
-static CYTHON_INLINE int __Pyx_PyObject_Append(PyObject* L, PyObject* x);
-
-/* pybytes_as_double.proto (used by pynumber_float) */
+/* pybytes_as_double.proto (used by pyobject_as_double) */
 static double __Pyx_SlowPyString_AsDouble(PyObject *obj);
 static double __Pyx__PyBytes_AsDouble(PyObject *obj, const char* start, Py_ssize_t length);
 static CYTHON_INLINE double __Pyx_PyBytes_AsDouble(PyObject *obj) {
@@ -2008,7 +1983,7 @@ static CYTHON_INLINE double __Pyx_PyByteArray_AsDouble(PyObject *obj) {
     return __Pyx__PyBytes_AsDouble(obj, as_c_string, size);
 }
 
-/* pyunicode_as_double.proto (used by pynumber_float) */
+/* pyunicode_as_double.proto (used by pyobject_as_double) */
 #if !CYTHON_COMPILING_IN_PYPY && CYTHON_ASSUME_SAFE_MACROS
 static const char* __Pyx__PyUnicode_AsDouble_Copy(const void* data, const int kind, char* buffer, Py_ssize_t start, Py_ssize_t end) {
     int last_was_punctuation;
@@ -2135,29 +2110,18 @@ static CYTHON_INLINE double __Pyx_PyUnicode_AsDouble(PyObject *obj) {
 #endif
 }
 
-/* pynumber_float.proto */
-static CYTHON_INLINE PyObject* __Pyx__PyNumber_Float(PyObject* obj);
-#define __Pyx_PyNumber_Float(x) (PyFloat_CheckExact(x) ? __Pyx_NewRef(x) : __Pyx__PyNumber_Float(x))
-
-/* ListCompAppend.proto */
-#if CYTHON_USE_PYLIST_INTERNALS && CYTHON_ASSUME_SAFE_MACROS
-static CYTHON_INLINE int __Pyx_ListComp_Append(PyObject* list, PyObject* x) {
-    PyListObject* L = (PyListObject*) list;
-    Py_ssize_t len = Py_SIZE(list);
-    if (likely(L->allocated > len)) {
-        Py_INCREF(x);
-        #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030d0000
-        L->ob_item[len] = x;
-        #else
-        PyList_SET_ITEM(list, len, x);
-        #endif
-        __Pyx_SET_SIZE(list, len + 1);
-        return 0;
-    }
-    return PyList_Append(list, x);
-}
+/* pyobject_as_double.proto */
+static double __Pyx__PyObject_AsDouble(PyObject* obj);
+#if CYTHON_COMPILING_IN_PYPY
+#define __Pyx_PyObject_AsDouble(obj)\
+(likely(PyFloat_CheckExact(obj)) ? PyFloat_AS_DOUBLE(obj) :\
+ likely(PyLong_CheckExact(obj)) ?\
+ PyFloat_AsDouble(obj) : __Pyx__PyObject_AsDouble(obj))
 #else
-#define __Pyx_ListComp_Append(L,x) PyList_Append(L,x)
+#define __Pyx_PyObject_AsDouble(obj)\
+((likely(PyFloat_CheckExact(obj))) ?  __Pyx_PyFloat_AS_DOUBLE(obj) :\
+ likely(PyLong_CheckExact(obj)) ?\
+ PyLong_AsDouble(obj) : __Pyx__PyObject_AsDouble(obj))
 #endif
 
 /* GetItemInt.proto */
@@ -2181,6 +2145,16 @@ static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Tuple_Fast(PyObject *o, Py_ssize
 static PyObject *__Pyx_GetItemInt_Generic(PyObject *o, PyObject* j);
 static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i,
                                                      int is_list, int wraparound, int boundscheck, int unsafe_shared);
+
+/* FloatExceptionCheck.proto */
+#define __PYX_CHECK_FLOAT_EXCEPTION(value, error_value)\
+    ((error_value) == (error_value) ?\
+     (value) == (error_value) :\
+     (value) != (value))
+
+/* pynumber_float.proto */
+static CYTHON_INLINE PyObject* __Pyx__PyNumber_Float(PyObject* obj);
+#define __Pyx_PyNumber_Float(x) (PyFloat_CheckExact(x) ? __Pyx_NewRef(x) : __Pyx__PyNumber_Float(x))
 
 /* HasAttr.proto (used by ImportImpl) */
 #if __PYX_LIMITED_VERSION_HEX >= 0x030d0000
@@ -2359,6 +2333,9 @@ static PyObject *__Pyx_CyFunction_New(PyMethodDef *ml,
 #else
 #define __Pyx_SetNameInClass(ns, name, value)  PyObject_SetItem(ns, name, value)
 #endif
+
+/* PyObjectCall2Args.proto (used by Py3ClassCreate) */
+static CYTHON_INLINE PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
 
 /* PyObjectLookupSpecial.proto (used by Py3ClassCreate) */
 #if CYTHON_USE_PYTYPE_LOOKUP && CYTHON_USE_TYPE_SLOTS
@@ -2584,7 +2561,7 @@ typedef struct {
   __Pyx_CachedCFunction __pyx_umethod_PyDict_Type_values;
   PyObject *__pyx_tuple[1];
   PyObject *__pyx_codeobj_tab[3];
-  PyObject *__pyx_string_tab[58];
+  PyObject *__pyx_string_tab[56];
   PyObject *__pyx_number_tab[2];
 /* #### Code section: module_state_contents ### */
 /* CommonTypesMetaclass.module_state_decls */
@@ -2642,48 +2619,46 @@ static __pyx_mstatetype * const __pyx_mstate_global = &__pyx_mstate_global_stati
 #define __pyx_n_u_Pyx_PyDict_NextRef __pyx_string_tab[13]
 #define __pyx_n_u_Random __pyx_string_tab[14]
 #define __pyx_n_u_Tensor __pyx_string_tab[15]
-#define __pyx_n_u_append __pyx_string_tab[16]
-#define __pyx_n_u_asyncio_coroutines __pyx_string_tab[17]
-#define __pyx_n_u_backward __pyx_string_tab[18]
-#define __pyx_n_u_calculate __pyx_string_tab[19]
-#define __pyx_n_u_clear __pyx_string_tab[20]
-#define __pyx_n_u_cline_in_traceback __pyx_string_tab[21]
-#define __pyx_n_u_data __pyx_string_tab[22]
-#define __pyx_n_u_derivative __pyx_string_tab[23]
-#define __pyx_n_u_doc __pyx_string_tab[24]
-#define __pyx_n_u_float __pyx_string_tab[25]
-#define __pyx_n_u_func __pyx_string_tab[26]
-#define __pyx_n_u_i __pyx_string_tab[27]
-#define __pyx_n_u_init __pyx_string_tab[28]
-#define __pyx_n_u_is_coroutine __pyx_string_tab[29]
-#define __pyx_n_u_items __pyx_string_tab[30]
-#define __pyx_n_u_main __pyx_string_tab[31]
-#define __pyx_n_u_mask __pyx_string_tab[32]
-#define __pyx_n_u_metaclass __pyx_string_tab[33]
-#define __pyx_n_u_module __pyx_string_tab[34]
-#define __pyx_n_u_mro_entries __pyx_string_tab[35]
-#define __pyx_n_u_multiplier __pyx_string_tab[36]
-#define __pyx_n_u_name __pyx_string_tab[37]
-#define __pyx_n_u_old_value __pyx_string_tab[38]
-#define __pyx_n_u_out __pyx_string_tab[39]
-#define __pyx_n_u_p __pyx_string_tab[40]
-#define __pyx_n_u_pop __pyx_string_tab[41]
-#define __pyx_n_u_prepare __pyx_string_tab[42]
-#define __pyx_n_u_qualname __pyx_string_tab[43]
-#define __pyx_n_u_r __pyx_string_tab[44]
-#define __pyx_n_u_random __pyx_string_tab[45]
-#define __pyx_n_u_return __pyx_string_tab[46]
-#define __pyx_n_u_rng __pyx_string_tab[47]
-#define __pyx_n_u_self __pyx_string_tab[48]
-#define __pyx_n_u_set_name __pyx_string_tab[49]
-#define __pyx_n_u_setdefault __pyx_string_tab[50]
-#define __pyx_n_u_shape __pyx_string_tab[51]
-#define __pyx_n_u_test __pyx_string_tab[52]
-#define __pyx_n_u_value __pyx_string_tab[53]
-#define __pyx_n_u_values __pyx_string_tab[54]
-#define __pyx_kp_b_iso88591_2_Q_vQauAXU_4r_U_3d_uASPQQUU__d __pyx_string_tab[55]
-#define __pyx_kp_b_iso88591_E_q_T_D_a_a_M_a_G7_r_4q_E_7_5_B __pyx_string_tab[56]
-#define __pyx_kp_b_iso88591_a_E_aq_JgT_q __pyx_string_tab[57]
+#define __pyx_n_u_asyncio_coroutines __pyx_string_tab[16]
+#define __pyx_n_u_backward __pyx_string_tab[17]
+#define __pyx_n_u_calculate __pyx_string_tab[18]
+#define __pyx_n_u_cline_in_traceback __pyx_string_tab[19]
+#define __pyx_n_u_data __pyx_string_tab[20]
+#define __pyx_n_u_derivative __pyx_string_tab[21]
+#define __pyx_n_u_doc __pyx_string_tab[22]
+#define __pyx_n_u_float __pyx_string_tab[23]
+#define __pyx_n_u_func __pyx_string_tab[24]
+#define __pyx_n_u_i __pyx_string_tab[25]
+#define __pyx_n_u_init __pyx_string_tab[26]
+#define __pyx_n_u_is_coroutine __pyx_string_tab[27]
+#define __pyx_n_u_items __pyx_string_tab[28]
+#define __pyx_n_u_main __pyx_string_tab[29]
+#define __pyx_n_u_mask __pyx_string_tab[30]
+#define __pyx_n_u_metaclass __pyx_string_tab[31]
+#define __pyx_n_u_module __pyx_string_tab[32]
+#define __pyx_n_u_mro_entries __pyx_string_tab[33]
+#define __pyx_n_u_multiplier __pyx_string_tab[34]
+#define __pyx_n_u_n __pyx_string_tab[35]
+#define __pyx_n_u_name __pyx_string_tab[36]
+#define __pyx_n_u_out __pyx_string_tab[37]
+#define __pyx_n_u_p __pyx_string_tab[38]
+#define __pyx_n_u_pop __pyx_string_tab[39]
+#define __pyx_n_u_prepare __pyx_string_tab[40]
+#define __pyx_n_u_qualname __pyx_string_tab[41]
+#define __pyx_n_u_r __pyx_string_tab[42]
+#define __pyx_n_u_random __pyx_string_tab[43]
+#define __pyx_n_u_return __pyx_string_tab[44]
+#define __pyx_n_u_rng __pyx_string_tab[45]
+#define __pyx_n_u_self __pyx_string_tab[46]
+#define __pyx_n_u_set_name __pyx_string_tab[47]
+#define __pyx_n_u_setdefault __pyx_string_tab[48]
+#define __pyx_n_u_shape __pyx_string_tab[49]
+#define __pyx_n_u_test __pyx_string_tab[50]
+#define __pyx_n_u_value __pyx_string_tab[51]
+#define __pyx_n_u_values __pyx_string_tab[52]
+#define __pyx_kp_b_iso88591_2_Q_s_4q_E_aq_q_U_85_Rt5_vQe5 __pyx_string_tab[53]
+#define __pyx_kp_b_iso88591_a_E_aq_JgT_q __pyx_string_tab[54]
+#define __pyx_kp_b_iso88591_s_5_S_Bd_HAU_A_E_aq_G7_r_4q_E_q __pyx_string_tab[55]
 #define __pyx_float_0_0 __pyx_number_tab[0]
 #define __pyx_float_1_0 __pyx_number_tab[1]
 /* #### Code section: module_state_clear ### */
@@ -2702,7 +2677,7 @@ static CYTHON_SMALL_CODE int __pyx_m_clear(PyObject *m) {
   #endif
   for (int i=0; i<1; ++i) { Py_CLEAR(clear_module_state->__pyx_tuple[i]); }
   for (int i=0; i<3; ++i) { Py_CLEAR(clear_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<58; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<56; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
   for (int i=0; i<2; ++i) { Py_CLEAR(clear_module_state->__pyx_number_tab[i]); }
 /* #### Code section: module_state_clear_contents ### */
 /* CommonTypesMetaclass.module_state_clear */
@@ -2728,7 +2703,7 @@ static CYTHON_SMALL_CODE int __pyx_m_traverse(PyObject *m, visitproc visit, void
   __Pyx_VISIT_CONST(traverse_module_state->__pyx_empty_unicode);
   for (int i=0; i<1; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_tuple[i]); }
   for (int i=0; i<3; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<58; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<56; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
   for (int i=0; i<2; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_number_tab[i]); }
 /* #### Code section: module_state_traverse_contents ### */
 /* CommonTypesMetaclass.module_state_traverse */
@@ -2743,7 +2718,7 @@ return 0;
 #endif
 /* #### Code section: module_code ### */
 
-/* "ComputationalGraph/Function/Dropout.pyx":12
+/* "ComputationalGraph/Function/Dropout.pyx":14
  *     """
  * 
  *     def __init__(self, p: float, rng: random.Random | None = None):             # <<<<<<<<<<<<<<
@@ -2793,53 +2768,53 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_p,&__pyx_mstate_global->__pyx_n_u_rng,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 12, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 14, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 14, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 14, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 14, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "__init__", 0) < (0)) __PYX_ERR(0, 12, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "__init__", 0) < (0)) __PYX_ERR(0, 14, __pyx_L3_error)
       if (!values[2]) values[2] = __Pyx_NewRef(((PyObject *)Py_None));
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("__init__", 0, 2, 3, i); __PYX_ERR(0, 12, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("__init__", 0, 2, 3, i); __PYX_ERR(0, 14, __pyx_L3_error) }
       }
     } else {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 14, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 14, __pyx_L3_error)
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 12, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 14, __pyx_L3_error)
         break;
         default: goto __pyx_L5_argtuple_error;
       }
       if (!values[2]) values[2] = __Pyx_NewRef(((PyObject *)Py_None));
     }
     __pyx_v_self = values[0];
-    __pyx_v_p = __Pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_p == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 12, __pyx_L3_error)
+    __pyx_v_p = __Pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_p == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 14, __pyx_L3_error)
     __pyx_v_rng = values[2];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("__init__", 0, 2, 3, __pyx_nargs); __PYX_ERR(0, 12, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("__init__", 0, 2, 3, __pyx_nargs); __PYX_ERR(0, 14, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -2875,19 +2850,19 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout___ini
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__init__", 0);
 
-  /* "ComputationalGraph/Function/Dropout.pyx":19
+  /* "ComputationalGraph/Function/Dropout.pyx":21
  *         @param rng Optional random number generator.
  *         """
  *         self.p = float(p)             # <<<<<<<<<<<<<<
  *         self.random = rng if rng is not None else random.Random()
  *         self.mask: list[float] = []
 */
-  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_p); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
+  __pyx_t_1 = PyFloat_FromDouble(__pyx_v_p); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p, __pyx_t_1) < (0)) __PYX_ERR(0, 19, __pyx_L1_error)
+  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p, __pyx_t_1) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":20
+  /* "ComputationalGraph/Function/Dropout.pyx":22
  *         """
  *         self.p = float(p)
  *         self.random = rng if rng is not None else random.Random()             # <<<<<<<<<<<<<<
@@ -2900,9 +2875,9 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout___ini
     __pyx_t_1 = __pyx_v_rng;
   } else {
     __pyx_t_4 = NULL;
-    __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_random); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 20, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_random); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 22, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_Random); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 20, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_Random); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 22, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __pyx_t_7 = 1;
@@ -2922,28 +2897,28 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout___ini
       __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_6, __pyx_callargs+__pyx_t_7, (1-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
       __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 20, __pyx_L1_error)
+      if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 22, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
     }
     __pyx_t_1 = __pyx_t_3;
     __pyx_t_3 = 0;
   }
-  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_random, __pyx_t_1) < (0)) __PYX_ERR(0, 20, __pyx_L1_error)
+  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_random, __pyx_t_1) < (0)) __PYX_ERR(0, 22, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":21
+  /* "ComputationalGraph/Function/Dropout.pyx":23
  *         self.p = float(p)
  *         self.random = rng if rng is not None else random.Random()
  *         self.mask: list[float] = []             # <<<<<<<<<<<<<<
  * 
  *     def calculate(self, value: Tensor) -> Tensor:
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 23, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask, __pyx_t_1) < (0)) __PYX_ERR(0, 21, __pyx_L1_error)
+  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask, __pyx_t_1) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":12
+  /* "ComputationalGraph/Function/Dropout.pyx":14
  *     """
  * 
  *     def __init__(self, p: float, rng: random.Random | None = None):             # <<<<<<<<<<<<<<
@@ -2968,7 +2943,7 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout___ini
   return __pyx_r;
 }
 
-/* "ComputationalGraph/Function/Dropout.pyx":23
+/* "ComputationalGraph/Function/Dropout.pyx":25
  *         self.mask: list[float] = []
  * 
  *     def calculate(self, value: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
@@ -3017,39 +2992,39 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_value,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 23, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 25, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 25, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 25, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "calculate", 0) < (0)) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "calculate", 0) < (0)) __PYX_ERR(0, 25, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("calculate", 1, 2, 2, i); __PYX_ERR(0, 23, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("calculate", 1, 2, 2, i); __PYX_ERR(0, 25, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 25, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 23, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 25, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_value = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("calculate", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 23, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("calculate", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 25, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3071,288 +3046,260 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 }
 
 static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout_2calculate(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_self, PyObject *__pyx_v_value) {
-  PyObject *__pyx_v_multiplier = NULL;
-  PyObject *__pyx_v_out = NULL;
-  PyObject *__pyx_v_old_value = NULL;
-  PyObject *__pyx_v_r = NULL;
+  Py_ssize_t __pyx_v_i;
+  Py_ssize_t __pyx_v_n;
+  double __pyx_v_multiplier;
+  double __pyx_v_r;
+  PyObject *__pyx_v_out = 0;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
-  PyObject *__pyx_t_2 = NULL;
+  Py_ssize_t __pyx_t_2;
   PyObject *__pyx_t_3 = NULL;
-  size_t __pyx_t_4;
+  double __pyx_t_4;
   Py_ssize_t __pyx_t_5;
-  PyObject *(*__pyx_t_6)(PyObject *);
+  Py_ssize_t __pyx_t_6;
   PyObject *__pyx_t_7 = NULL;
-  int __pyx_t_8;
+  size_t __pyx_t_8;
   int __pyx_t_9;
+  PyObject *__pyx_t_10 = NULL;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("calculate", 0);
 
-  /* "ComputationalGraph/Function/Dropout.pyx":30
+  /* "ComputationalGraph/Function/Dropout.pyx":32
  *         @return Output tensor after dropout masking and scaling.
  *         """
- *         self.mask.clear()             # <<<<<<<<<<<<<<
- *         multiplier = 1.0 / (1.0 - self.p)
- *         out = []
+ *         cdef Py_ssize_t i, n = len(value.data)             # <<<<<<<<<<<<<<
+ *         cdef double multiplier = 1.0 / (1.0 - self.p)
+ *         cdef double r
 */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 30, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __pyx_t_3;
-  __Pyx_INCREF(__pyx_t_2);
-  __pyx_t_4 = 0;
-  {
-    PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
-    __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_clear, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-    __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 30, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-  }
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-
-  /* "ComputationalGraph/Function/Dropout.pyx":31
- *         """
- *         self.mask.clear()
- *         multiplier = 1.0 / (1.0 - self.p)             # <<<<<<<<<<<<<<
- *         out = []
- *         for old_value in value.data:
-*/
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_data); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = __Pyx_PyFloat_SubtractCObj(__pyx_mstate_global->__pyx_float_1_0, __pyx_t_1, 1.0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_2 = PyObject_Length(__pyx_t_1); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 32, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_n = __pyx_t_2;
+
+  /* "ComputationalGraph/Function/Dropout.pyx":33
+ *         """
+ *         cdef Py_ssize_t i, n = len(value.data)
+ *         cdef double multiplier = 1.0 / (1.0 - self.p)             # <<<<<<<<<<<<<<
+ *         cdef double r
+ *         cdef list out = [0.0] * n
+*/
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = __Pyx_PyFloat_SubtractCObj(__pyx_mstate_global->__pyx_float_1_0, __pyx_t_1, 1.0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyFloat_TrueDivideCObj(__pyx_mstate_global->__pyx_float_1_0, __pyx_t_3, 1.0, 0, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyFloat_TrueDivideCObj(__pyx_mstate_global->__pyx_float_1_0, __pyx_t_3, 1.0, 0, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_v_multiplier = __pyx_t_1;
-  __pyx_t_1 = 0;
+  __pyx_t_4 = __Pyx_PyFloat_AsDouble(__pyx_t_1); if (unlikely((__pyx_t_4 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_multiplier = __pyx_t_4;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":32
- *         self.mask.clear()
- *         multiplier = 1.0 / (1.0 - self.p)
- *         out = []             # <<<<<<<<<<<<<<
- *         for old_value in value.data:
- *             r = self.random.random()
+  /* "ComputationalGraph/Function/Dropout.pyx":35
+ *         cdef double multiplier = 1.0 / (1.0 - self.p)
+ *         cdef double r
+ *         cdef list out = [0.0] * n             # <<<<<<<<<<<<<<
+ * 
+ *         self.mask = [0.0] * n
 */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(1 * ((__pyx_v_n<0) ? 0:__pyx_v_n)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
+  { Py_ssize_t __pyx_temp;
+    for (__pyx_temp=0; __pyx_temp < __pyx_v_n; __pyx_temp++) {
+      __Pyx_INCREF(__pyx_mstate_global->__pyx_float_0_0);
+      __Pyx_GIVEREF(__pyx_mstate_global->__pyx_float_0_0);
+      if (__Pyx_PyList_SET_ITEM(__pyx_t_1, __pyx_temp, __pyx_mstate_global->__pyx_float_0_0) != (0)) __PYX_ERR(0, 35, __pyx_L1_error);
+    }
+  }
   __pyx_v_out = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":33
- *         multiplier = 1.0 / (1.0 - self.p)
- *         out = []
- *         for old_value in value.data:             # <<<<<<<<<<<<<<
+  /* "ComputationalGraph/Function/Dropout.pyx":37
+ *         cdef list out = [0.0] * n
+ * 
+ *         self.mask = [0.0] * n             # <<<<<<<<<<<<<<
+ *         for i in range(n):
+ *             r = self.random.random()
+*/
+  __pyx_t_1 = PyList_New(1 * ((__pyx_v_n<0) ? 0:__pyx_v_n)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 37, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  { Py_ssize_t __pyx_temp;
+    for (__pyx_temp=0; __pyx_temp < __pyx_v_n; __pyx_temp++) {
+      __Pyx_INCREF(__pyx_mstate_global->__pyx_float_0_0);
+      __Pyx_GIVEREF(__pyx_mstate_global->__pyx_float_0_0);
+      if (__Pyx_PyList_SET_ITEM(__pyx_t_1, __pyx_temp, __pyx_mstate_global->__pyx_float_0_0) != (0)) __PYX_ERR(0, 37, __pyx_L1_error);
+    }
+  }
+  if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask, __pyx_t_1) < (0)) __PYX_ERR(0, 37, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "ComputationalGraph/Function/Dropout.pyx":38
+ * 
+ *         self.mask = [0.0] * n
+ *         for i in range(n):             # <<<<<<<<<<<<<<
  *             r = self.random.random()
  *             if r > self.p:
 */
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_data); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  if (likely(PyList_CheckExact(__pyx_t_1)) || PyTuple_CheckExact(__pyx_t_1)) {
-    __pyx_t_3 = __pyx_t_1; __Pyx_INCREF(__pyx_t_3);
-    __pyx_t_5 = 0;
-    __pyx_t_6 = NULL;
-  } else {
-    __pyx_t_5 = -1; __pyx_t_3 = PyObject_GetIter(__pyx_t_1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_6 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_3); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 33, __pyx_L1_error)
-  }
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  for (;;) {
-    if (likely(!__pyx_t_6)) {
-      if (likely(PyList_CheckExact(__pyx_t_3))) {
-        {
-          Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_3);
-          #if !CYTHON_ASSUME_SAFE_SIZE
-          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 33, __pyx_L1_error)
-          #endif
-          if (__pyx_t_5 >= __pyx_temp) break;
-        }
-        __pyx_t_1 = __Pyx_PyList_GetItemRefFast(__pyx_t_3, __pyx_t_5, __Pyx_ReferenceSharing_OwnStrongReference);
-        ++__pyx_t_5;
-      } else {
-        {
-          Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_3);
-          #if !CYTHON_ASSUME_SAFE_SIZE
-          if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 33, __pyx_L1_error)
-          #endif
-          if (__pyx_t_5 >= __pyx_temp) break;
-        }
-        #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-        __pyx_t_1 = __Pyx_NewRef(PyTuple_GET_ITEM(__pyx_t_3, __pyx_t_5));
-        #else
-        __pyx_t_1 = __Pyx_PySequence_ITEM(__pyx_t_3, __pyx_t_5);
-        #endif
-        ++__pyx_t_5;
-      }
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
-    } else {
-      __pyx_t_1 = __pyx_t_6(__pyx_t_3);
-      if (unlikely(!__pyx_t_1)) {
-        PyObject* exc_type = PyErr_Occurred();
-        if (exc_type) {
-          if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 33, __pyx_L1_error)
-          PyErr_Clear();
-        }
-        break;
-      }
-    }
-    __Pyx_GOTREF(__pyx_t_1);
-    __Pyx_XDECREF_SET(__pyx_v_old_value, __pyx_t_1);
-    __pyx_t_1 = 0;
+  __pyx_t_2 = __pyx_v_n;
+  __pyx_t_5 = __pyx_t_2;
+  for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
+    __pyx_v_i = __pyx_t_6;
 
-    /* "ComputationalGraph/Function/Dropout.pyx":34
- *         out = []
- *         for old_value in value.data:
+    /* "ComputationalGraph/Function/Dropout.pyx":39
+ *         self.mask = [0.0] * n
+ *         for i in range(n):
  *             r = self.random.random()             # <<<<<<<<<<<<<<
  *             if r > self.p:
- *                 self.mask.append(multiplier)
+ *                 self.mask[i] = multiplier
 */
-    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_random); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 34, __pyx_L1_error)
+    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_random); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 39, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_7);
-    __pyx_t_2 = __pyx_t_7;
-    __Pyx_INCREF(__pyx_t_2);
-    __pyx_t_4 = 0;
+    __pyx_t_3 = __pyx_t_7;
+    __Pyx_INCREF(__pyx_t_3);
+    __pyx_t_8 = 0;
     {
-      PyObject *__pyx_callargs[2] = {__pyx_t_2, NULL};
-      __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_random, __pyx_callargs+__pyx_t_4, (1-__pyx_t_4) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-      __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
+      PyObject *__pyx_callargs[2] = {__pyx_t_3, NULL};
+      __pyx_t_1 = __Pyx_PyObject_FastCallMethod((PyObject*)__pyx_mstate_global->__pyx_n_u_random, __pyx_callargs+__pyx_t_8, (1-__pyx_t_8) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+      __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
       __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 34, __pyx_L1_error)
+      if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 39, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
     }
-    __Pyx_XDECREF_SET(__pyx_v_r, __pyx_t_1);
-    __pyx_t_1 = 0;
-
-    /* "ComputationalGraph/Function/Dropout.pyx":35
- *         for old_value in value.data:
- *             r = self.random.random()
- *             if r > self.p:             # <<<<<<<<<<<<<<
- *                 self.mask.append(multiplier)
- *                 out.append(float(old_value) * multiplier)
-*/
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 35, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_7 = PyObject_RichCompare(__pyx_v_r, __pyx_t_1, Py_GT); __Pyx_XGOTREF(__pyx_t_7); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 35, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyFloat_AsDouble(__pyx_t_1); if (unlikely((__pyx_t_4 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 39, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __pyx_t_8 = __Pyx_PyObject_IsTrue(__pyx_t_7); if (unlikely((__pyx_t_8 < 0))) __PYX_ERR(0, 35, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (__pyx_t_8) {
+    __pyx_v_r = __pyx_t_4;
 
-      /* "ComputationalGraph/Function/Dropout.pyx":36
- *             r = self.random.random()
- *             if r > self.p:
- *                 self.mask.append(multiplier)             # <<<<<<<<<<<<<<
- *                 out.append(float(old_value) * multiplier)
- *             else:
-*/
-      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 36, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_7);
-      __pyx_t_9 = __Pyx_PyObject_Append(__pyx_t_7, __pyx_v_multiplier); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 36, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-
-      /* "ComputationalGraph/Function/Dropout.pyx":37
- *             if r > self.p:
- *                 self.mask.append(multiplier)
- *                 out.append(float(old_value) * multiplier)             # <<<<<<<<<<<<<<
- *             else:
- *                 self.mask.append(0.0)
-*/
-      __pyx_t_7 = __Pyx_PyNumber_Float(__pyx_v_old_value); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 37, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_7);
-      __pyx_t_1 = PyNumber_Multiply(__pyx_t_7, __pyx_v_multiplier); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 37, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_1);
-      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_out, __pyx_t_1); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 37, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-
-      /* "ComputationalGraph/Function/Dropout.pyx":35
- *         for old_value in value.data:
+    /* "ComputationalGraph/Function/Dropout.pyx":40
+ *         for i in range(n):
  *             r = self.random.random()
  *             if r > self.p:             # <<<<<<<<<<<<<<
- *                 self.mask.append(multiplier)
- *                 out.append(float(old_value) * multiplier)
+ *                 self.mask[i] = multiplier
+ *                 out[i] = float(value.data[i]) * multiplier
+*/
+    __pyx_t_1 = PyFloat_FromDouble(__pyx_v_r); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 40, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_p); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 40, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_7, Py_GT); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 40, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 40, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    if (__pyx_t_9) {
+
+      /* "ComputationalGraph/Function/Dropout.pyx":41
+ *             r = self.random.random()
+ *             if r > self.p:
+ *                 self.mask[i] = multiplier             # <<<<<<<<<<<<<<
+ *                 out[i] = float(value.data[i]) * multiplier
+ *             else:
+*/
+      __pyx_t_3 = PyFloat_FromDouble(__pyx_v_multiplier); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 41, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_3);
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 41, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      if (unlikely((__Pyx_SetItemInt(__pyx_t_7, __pyx_v_i, __pyx_t_3, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference) < 0))) __PYX_ERR(0, 41, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+
+      /* "ComputationalGraph/Function/Dropout.pyx":42
+ *             if r > self.p:
+ *                 self.mask[i] = multiplier
+ *                 out[i] = float(value.data[i]) * multiplier             # <<<<<<<<<<<<<<
+ *             else:
+ *                 self.mask[i] = 0.0
+*/
+      __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_data); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 42, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_3);
+      __pyx_t_7 = __Pyx_GetItemInt(__pyx_t_3, __pyx_v_i, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 42, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+      __pyx_t_4 = __Pyx_PyObject_AsDouble(__pyx_t_7); if (unlikely(__PYX_CHECK_FLOAT_EXCEPTION(__pyx_t_4, ((double)((double)-1))) && PyErr_Occurred())) __PYX_ERR(0, 42, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __pyx_t_7 = PyFloat_FromDouble((__pyx_t_4 * __pyx_v_multiplier)); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 42, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      if (unlikely((__Pyx_SetItemInt(__pyx_v_out, __pyx_v_i, __pyx_t_7, Py_ssize_t, 1, PyLong_FromSsize_t, 1, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference) < 0))) __PYX_ERR(0, 42, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+
+      /* "ComputationalGraph/Function/Dropout.pyx":40
+ *         for i in range(n):
+ *             r = self.random.random()
+ *             if r > self.p:             # <<<<<<<<<<<<<<
+ *                 self.mask[i] = multiplier
+ *                 out[i] = float(value.data[i]) * multiplier
 */
       goto __pyx_L5;
     }
 
-    /* "ComputationalGraph/Function/Dropout.pyx":39
- *                 out.append(float(old_value) * multiplier)
+    /* "ComputationalGraph/Function/Dropout.pyx":44
+ *                 out[i] = float(value.data[i]) * multiplier
  *             else:
- *                 self.mask.append(0.0)             # <<<<<<<<<<<<<<
- *                 out.append(0.0)
+ *                 self.mask[i] = 0.0             # <<<<<<<<<<<<<<
+ *                 out[i] = 0.0
  *         return Tensor(out, value.shape)
 */
     /*else*/ {
-      __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 39, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_1);
-      __pyx_t_9 = __Pyx_PyObject_Append(__pyx_t_1, __pyx_mstate_global->__pyx_float_0_0); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 39, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 44, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      if (unlikely((__Pyx_SetItemInt(__pyx_t_7, __pyx_v_i, __pyx_mstate_global->__pyx_float_0_0, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference) < 0))) __PYX_ERR(0, 44, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-      /* "ComputationalGraph/Function/Dropout.pyx":40
+      /* "ComputationalGraph/Function/Dropout.pyx":45
  *             else:
- *                 self.mask.append(0.0)
- *                 out.append(0.0)             # <<<<<<<<<<<<<<
+ *                 self.mask[i] = 0.0
+ *                 out[i] = 0.0             # <<<<<<<<<<<<<<
  *         return Tensor(out, value.shape)
  * 
 */
-      __pyx_t_9 = __Pyx_PyList_Append(__pyx_v_out, __pyx_mstate_global->__pyx_float_0_0); if (unlikely(__pyx_t_9 == ((int)-1))) __PYX_ERR(0, 40, __pyx_L1_error)
+      if (unlikely((__Pyx_SetItemInt(__pyx_v_out, __pyx_v_i, __pyx_mstate_global->__pyx_float_0_0, Py_ssize_t, 1, PyLong_FromSsize_t, 1, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference) < 0))) __PYX_ERR(0, 45, __pyx_L1_error)
     }
     __pyx_L5:;
-
-    /* "ComputationalGraph/Function/Dropout.pyx":33
- *         multiplier = 1.0 / (1.0 - self.p)
- *         out = []
- *         for old_value in value.data:             # <<<<<<<<<<<<<<
- *             r = self.random.random()
- *             if r > self.p:
-*/
   }
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":41
- *                 self.mask.append(0.0)
- *                 out.append(0.0)
+  /* "ComputationalGraph/Function/Dropout.pyx":46
+ *                 self.mask[i] = 0.0
+ *                 out[i] = 0.0
  *         return Tensor(out, value.shape)             # <<<<<<<<<<<<<<
  * 
  *     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_Tensor); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 41, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_7);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_shape); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 41, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_4 = 1;
+  __pyx_t_3 = NULL;
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_Tensor); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_shape); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 46, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_10);
+  __pyx_t_8 = 1;
   #if CYTHON_UNPACK_METHODS
-  if (unlikely(PyMethod_Check(__pyx_t_7))) {
-    __pyx_t_1 = PyMethod_GET_SELF(__pyx_t_7);
-    assert(__pyx_t_1);
-    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_7);
-    __Pyx_INCREF(__pyx_t_1);
+  if (unlikely(PyMethod_Check(__pyx_t_1))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    assert(__pyx_t_3);
+    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_1);
+    __Pyx_INCREF(__pyx_t_3);
     __Pyx_INCREF(__pyx__function);
-    __Pyx_DECREF_SET(__pyx_t_7, __pyx__function);
-    __pyx_t_4 = 0;
+    __Pyx_DECREF_SET(__pyx_t_1, __pyx__function);
+    __pyx_t_8 = 0;
   }
   #endif
   {
-    PyObject *__pyx_callargs[3] = {__pyx_t_1, __pyx_v_out, __pyx_t_2};
-    __pyx_t_3 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_7, __pyx_callargs+__pyx_t_4, (3-__pyx_t_4) | (__pyx_t_4*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-    __Pyx_XDECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 41, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_3);
+    PyObject *__pyx_callargs[3] = {__pyx_t_3, __pyx_v_out, __pyx_t_10};
+    __pyx_t_7 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_8, (3-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+    __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 46, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_7);
   }
-  __pyx_r = __pyx_t_3;
-  __pyx_t_3 = 0;
+  __pyx_r = __pyx_t_7;
+  __pyx_t_7 = 0;
   goto __pyx_L0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":23
+  /* "ComputationalGraph/Function/Dropout.pyx":25
  *         self.mask: list[float] = []
  * 
  *     def calculate(self, value: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
@@ -3363,22 +3310,19 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout_2calc
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_7);
+  __Pyx_XDECREF(__pyx_t_10);
   __Pyx_AddTraceback("ComputationalGraph.Function.Dropout.Dropout.calculate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
-  __Pyx_XDECREF(__pyx_v_multiplier);
   __Pyx_XDECREF(__pyx_v_out);
-  __Pyx_XDECREF(__pyx_v_old_value);
-  __Pyx_XDECREF(__pyx_v_r);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "ComputationalGraph/Function/Dropout.pyx":43
+/* "ComputationalGraph/Function/Dropout.pyx":48
  *         return Tensor(out, value.shape)
  * 
  *     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
@@ -3428,38 +3372,38 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_self,&__pyx_mstate_global->__pyx_n_u_value,&__pyx_mstate_global->__pyx_n_u_backward,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 43, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 48, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  3:
         values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 43, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 48, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 43, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 48, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 43, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 48, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "derivative", 0) < (0)) __PYX_ERR(0, 43, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "derivative", 0) < (0)) __PYX_ERR(0, 48, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 3; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("derivative", 1, 3, 3, i); __PYX_ERR(0, 43, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("derivative", 1, 3, 3, i); __PYX_ERR(0, 48, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 43, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 48, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 43, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 48, __pyx_L3_error)
       values[2] = __Pyx_ArgRef_FASTCALL(__pyx_args, 2);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 43, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[2])) __PYX_ERR(0, 48, __pyx_L3_error)
     }
     __pyx_v_self = values[0];
     __pyx_v_value = values[1];
@@ -3467,7 +3411,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("derivative", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 43, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("derivative", 1, 3, 3, __pyx_nargs); __PYX_ERR(0, 48, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3489,94 +3433,132 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 }
 
 static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout_4derivative(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_self, PyObject *__pyx_v_value, PyObject *__pyx_v_backward) {
-  Py_ssize_t __pyx_7genexpr__pyx_v_i;
+  Py_ssize_t __pyx_v_i;
+  Py_ssize_t __pyx_v_n;
+  PyObject *__pyx_v_out = 0;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
-  PyObject *__pyx_t_2 = NULL;
-  PyObject *__pyx_t_3 = NULL;
-  PyObject *__pyx_t_4 = NULL;
+  Py_ssize_t __pyx_t_2;
+  Py_ssize_t __pyx_t_3;
+  Py_ssize_t __pyx_t_4;
   PyObject *__pyx_t_5 = NULL;
-  Py_ssize_t __pyx_t_6;
-  Py_ssize_t __pyx_t_7;
-  Py_ssize_t __pyx_t_8;
-  PyObject *__pyx_t_9 = NULL;
-  PyObject *__pyx_t_10 = NULL;
-  size_t __pyx_t_11;
+  PyObject *__pyx_t_6 = NULL;
+  PyObject *__pyx_t_7 = NULL;
+  size_t __pyx_t_8;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("derivative", 0);
 
-  /* "ComputationalGraph/Function/Dropout.pyx":51
+  /* "ComputationalGraph/Function/Dropout.pyx":56
  *         @return Gradient value of the corresponding node.
  *         """
- *         return Tensor([float(backward.data[i]) * self.mask[i] for i in range(len(self.mask))], value.shape)             # <<<<<<<<<<<<<<
+ *         cdef Py_ssize_t i, n = len(self.mask)             # <<<<<<<<<<<<<<
+ *         cdef list out = [0.0] * n
+ * 
+*/
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 56, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = PyObject_Length(__pyx_t_1); if (unlikely(__pyx_t_2 == ((Py_ssize_t)-1))) __PYX_ERR(0, 56, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_n = __pyx_t_2;
+
+  /* "ComputationalGraph/Function/Dropout.pyx":57
+ *         """
+ *         cdef Py_ssize_t i, n = len(self.mask)
+ *         cdef list out = [0.0] * n             # <<<<<<<<<<<<<<
+ * 
+ *         for i in range(n):
+*/
+  __pyx_t_1 = PyList_New(1 * ((__pyx_v_n<0) ? 0:__pyx_v_n)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 57, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  { Py_ssize_t __pyx_temp;
+    for (__pyx_temp=0; __pyx_temp < __pyx_v_n; __pyx_temp++) {
+      __Pyx_INCREF(__pyx_mstate_global->__pyx_float_0_0);
+      __Pyx_GIVEREF(__pyx_mstate_global->__pyx_float_0_0);
+      if (__Pyx_PyList_SET_ITEM(__pyx_t_1, __pyx_temp, __pyx_mstate_global->__pyx_float_0_0) != (0)) __PYX_ERR(0, 57, __pyx_L1_error);
+    }
+  }
+  __pyx_v_out = ((PyObject*)__pyx_t_1);
+  __pyx_t_1 = 0;
+
+  /* "ComputationalGraph/Function/Dropout.pyx":59
+ *         cdef list out = [0.0] * n
+ * 
+ *         for i in range(n):             # <<<<<<<<<<<<<<
+ *             out[i] = float(backward.data[i]) * self.mask[i]
+ *         return Tensor(out, value.shape)
+*/
+  __pyx_t_2 = __pyx_v_n;
+  __pyx_t_3 = __pyx_t_2;
+  for (__pyx_t_4 = 0; __pyx_t_4 < __pyx_t_3; __pyx_t_4+=1) {
+    __pyx_v_i = __pyx_t_4;
+
+    /* "ComputationalGraph/Function/Dropout.pyx":60
+ * 
+ *         for i in range(n):
+ *             out[i] = float(backward.data[i]) * self.mask[i]             # <<<<<<<<<<<<<<
+ *         return Tensor(out, value.shape)
+*/
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_backward, __pyx_mstate_global->__pyx_n_u_data); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_5 = __Pyx_GetItemInt(__pyx_t_1, __pyx_v_i, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __pyx_t_1 = __Pyx_PyNumber_Float(__pyx_t_5); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __pyx_t_6 = __Pyx_GetItemInt(__pyx_t_5, __pyx_v_i, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __pyx_t_5 = PyNumber_Multiply(__pyx_t_1, __pyx_t_6); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    if (unlikely((__Pyx_SetItemInt(__pyx_v_out, __pyx_v_i, __pyx_t_5, Py_ssize_t, 1, PyLong_FromSsize_t, 1, 0, 0, 1, __Pyx_ReferenceSharing_OwnStrongReference) < 0))) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  }
+
+  /* "ComputationalGraph/Function/Dropout.pyx":61
+ *         for i in range(n):
+ *             out[i] = float(backward.data[i]) * self.mask[i]
+ *         return Tensor(out, value.shape)             # <<<<<<<<<<<<<<
 */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_Tensor); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 51, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  { /* enter inner scope */
-    __pyx_t_4 = PyList_New(0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 51, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_4);
-    __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 51, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_6 = PyObject_Length(__pyx_t_5); if (unlikely(__pyx_t_6 == ((Py_ssize_t)-1))) __PYX_ERR(0, 51, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    __pyx_t_7 = __pyx_t_6;
-    for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
-      __pyx_7genexpr__pyx_v_i = __pyx_t_8;
-      __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_backward, __pyx_mstate_global->__pyx_n_u_data); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_9 = __Pyx_GetItemInt(__pyx_t_5, __pyx_7genexpr__pyx_v_i, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 1, 1, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __pyx_t_5 = __Pyx_PyNumber_Float(__pyx_t_9); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
-      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_mstate_global->__pyx_n_u_mask); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_9);
-      __pyx_t_10 = __Pyx_GetItemInt(__pyx_t_9, __pyx_7genexpr__pyx_v_i, Py_ssize_t, 1, PyLong_FromSsize_t, 0, 1, 1, 1, __Pyx_ReferenceSharing_OwnStrongReference); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_10);
-      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __pyx_t_9 = PyNumber_Multiply(__pyx_t_5, __pyx_t_10); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-      if (unlikely(__Pyx_ListComp_Append(__pyx_t_4, (PyObject*)__pyx_t_9))) __PYX_ERR(0, 51, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    }
-  } /* exit inner scope */
-  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_shape); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 51, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
-  __pyx_t_11 = 1;
+  __pyx_t_6 = NULL;
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_Tensor); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_v_value, __pyx_mstate_global->__pyx_n_u_shape); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_7);
+  __pyx_t_8 = 1;
   #if CYTHON_UNPACK_METHODS
-  if (unlikely(PyMethod_Check(__pyx_t_3))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_3);
-    assert(__pyx_t_2);
-    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_3);
-    __Pyx_INCREF(__pyx_t_2);
+  if (unlikely(PyMethod_Check(__pyx_t_1))) {
+    __pyx_t_6 = PyMethod_GET_SELF(__pyx_t_1);
+    assert(__pyx_t_6);
+    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_1);
+    __Pyx_INCREF(__pyx_t_6);
     __Pyx_INCREF(__pyx__function);
-    __Pyx_DECREF_SET(__pyx_t_3, __pyx__function);
-    __pyx_t_11 = 0;
+    __Pyx_DECREF_SET(__pyx_t_1, __pyx__function);
+    __pyx_t_8 = 0;
   }
   #endif
   {
-    PyObject *__pyx_callargs[3] = {__pyx_t_2, __pyx_t_4, __pyx_t_9};
-    __pyx_t_1 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_3, __pyx_callargs+__pyx_t_11, (3-__pyx_t_11) | (__pyx_t_11*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-    __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 51, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
+    PyObject *__pyx_callargs[3] = {__pyx_t_6, __pyx_v_out, __pyx_t_7};
+    __pyx_t_5 = __Pyx_PyObject_FastCall((PyObject*)__pyx_t_1, __pyx_callargs+__pyx_t_8, (3-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+    __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
+    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 61, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
   }
-  __pyx_r = __pyx_t_1;
-  __pyx_t_1 = 0;
+  __pyx_r = __pyx_t_5;
+  __pyx_t_5 = 0;
   goto __pyx_L0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":43
+  /* "ComputationalGraph/Function/Dropout.pyx":48
  *         return Tensor(out, value.shape)
  * 
  *     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
@@ -3587,15 +3569,13 @@ static PyObject *__pyx_pf_18ComputationalGraph_8Function_7Dropout_7Dropout_4deri
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2);
-  __Pyx_XDECREF(__pyx_t_3);
-  __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_XDECREF(__pyx_t_9);
-  __Pyx_XDECREF(__pyx_t_10);
+  __Pyx_XDECREF(__pyx_t_6);
+  __Pyx_XDECREF(__pyx_t_7);
   __Pyx_AddTraceback("ComputationalGraph.Function.Dropout.Dropout.derivative", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_out);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -3954,18 +3934,20 @@ __Pyx_RefNannySetupContext("PyInit_Dropout", 0);
   (void)__Pyx_modinit_function_import_code(__pyx_mstate);
   /*--- Execution code ---*/
 
-  /* "ComputationalGraph/Function/Dropout.pyx":1
+  /* "ComputationalGraph/Function/Dropout.pyx":3
+ * # cython: language_level=3, boundscheck=False, wraparound=False
+ * 
  * import random             # <<<<<<<<<<<<<<
  * 
  * from .Function import Function
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_random, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_random, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 3, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_random, __pyx_t_2) < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_random, __pyx_t_2) < (0)) __PYX_ERR(0, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":3
+  /* "ComputationalGraph/Function/Dropout.pyx":5
  * import random
  * 
  * from .Function import Function             # <<<<<<<<<<<<<<
@@ -3974,22 +3956,22 @@ __Pyx_RefNannySetupContext("PyInit_Dropout", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Function};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_Function, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_ComputationalGraph_Function_Func, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 3, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_Function, __pyx_imported_names, 1, __pyx_mstate_global->__pyx_kp_u_ComputationalGraph_Function_Func, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 5, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Function};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 3, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 5, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 3, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 5, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":4
+  /* "ComputationalGraph/Function/Dropout.pyx":6
  * 
  * from .Function import Function
  * from Math.Tensor import Tensor             # <<<<<<<<<<<<<<
@@ -3998,56 +3980,56 @@ __Pyx_RefNannySetupContext("PyInit_Dropout", 0);
 */
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Tensor};
-    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_Math_Tensor, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_Math_Tensor, __pyx_imported_names, 1, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 6, __pyx_L1_error)
   }
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
   {
     PyObject* const __pyx_imported_names[] = {__pyx_mstate_global->__pyx_n_u_Tensor};
     __pyx_t_3 = 0; {
-      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 4, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_ImportFrom(__pyx_t_2, __pyx_imported_names[__pyx_t_3]); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 6, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 4, __pyx_L1_error)
+      if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_imported_names[__pyx_t_3], __pyx_t_4) < (0)) __PYX_ERR(0, 6, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":7
+  /* "ComputationalGraph/Function/Dropout.pyx":9
  * 
  * 
  * class Dropout(Function):             # <<<<<<<<<<<<<<
  *     """
  *     Implements the Dropout function.
 */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_Function); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_Function); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_4 = PyTuple_Pack(1, __pyx_t_2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_4 = PyTuple_Pack(1, __pyx_t_2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PEP560_update_bases(__pyx_t_4); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PEP560_update_bases(__pyx_t_4); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_5 = __Pyx_CalculateMetaclass(NULL, __pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_CalculateMetaclass(NULL, __pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_Py3MetaclassPrepare(__pyx_t_5, __pyx_t_2, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_mstate_global->__pyx_n_u_Dropout, (PyObject *) NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_kp_u_Implements_the_Dropout_function); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_Py3MetaclassPrepare(__pyx_t_5, __pyx_t_2, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_mstate_global->__pyx_n_u_Dropout, (PyObject *) NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_kp_u_Implements_the_Dropout_function); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   if (__pyx_t_2 != __pyx_t_4) {
-    if (unlikely((PyDict_SetItemString(__pyx_t_6, "__orig_bases__", __pyx_t_4) < 0))) __PYX_ERR(0, 7, __pyx_L1_error)
+    if (unlikely((PyDict_SetItemString(__pyx_t_6, "__orig_bases__", __pyx_t_4) < 0))) __PYX_ERR(0, 9, __pyx_L1_error)
   }
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":12
+  /* "ComputationalGraph/Function/Dropout.pyx":14
  *     """
  * 
  *     def __init__(self, p: float, rng: random.Random | None = None):             # <<<<<<<<<<<<<<
  *         """
  *         Creates a Dropout function with the given dropout probability.
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_p, __pyx_mstate_global->__pyx_n_u_float) < (0)) __PYX_ERR(0, 12, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_rng, __pyx_mstate_global->__pyx_kp_u_random_Random_None) < (0)) __PYX_ERR(0, 12, __pyx_L1_error)
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_1__init__, 0, __pyx_mstate_global->__pyx_n_u_Dropout___init, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 12, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_p, __pyx_mstate_global->__pyx_n_u_float) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_rng, __pyx_mstate_global->__pyx_kp_u_random_Random_None) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_1__init__, 0, __pyx_mstate_global->__pyx_n_u_Dropout___init, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
@@ -4055,74 +4037,74 @@ __Pyx_RefNannySetupContext("PyInit_Dropout", 0);
   __Pyx_CyFunction_SetDefaultsTuple(__pyx_t_7, __pyx_mstate_global->__pyx_tuple[0]);
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_7, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_init, __pyx_t_7) < (0)) __PYX_ERR(0, 12, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_init, __pyx_t_7) < (0)) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":23
+  /* "ComputationalGraph/Function/Dropout.pyx":25
  *         self.mask: list[float] = []
  * 
  *     def calculate(self, value: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
  *         """
  *         Computes the dropout output for the given tensor.
 */
-  __pyx_t_7 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 23, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 25, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_value, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_3calculate, 0, __pyx_mstate_global->__pyx_n_u_Dropout_calculate, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_value, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 25, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_7, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_3calculate, 0, __pyx_mstate_global->__pyx_n_u_Dropout_calculate, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[1])); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 25, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_4);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_4, __pyx_t_7);
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_calculate, __pyx_t_4) < (0)) __PYX_ERR(0, 23, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_calculate, __pyx_t_4) < (0)) __PYX_ERR(0, 25, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":43
+  /* "ComputationalGraph/Function/Dropout.pyx":48
  *         return Tensor(out, value.shape)
  * 
  *     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:             # <<<<<<<<<<<<<<
  *         """
  *         Computes the derivative of the Dropout function.
 */
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 43, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_value, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 43, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_backward, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 43, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 43, __pyx_L1_error)
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_5derivative, 0, __pyx_mstate_global->__pyx_n_u_Dropout_derivative, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 43, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_value, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 48, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_backward, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 48, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_n_u_Tensor) < (0)) __PYX_ERR(0, 48, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_18ComputationalGraph_8Function_7Dropout_7Dropout_5derivative, 0, __pyx_mstate_global->__pyx_n_u_Dropout_derivative, NULL, __pyx_mstate_global->__pyx_n_u_ComputationalGraph_Function_Drop, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[2])); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_7, __pyx_t_4);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_derivative, __pyx_t_7) < (0)) __PYX_ERR(0, 43, __pyx_L1_error)
+  if (__Pyx_SetNameInClass(__pyx_t_6, __pyx_mstate_global->__pyx_n_u_derivative, __pyx_t_7) < (0)) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "ComputationalGraph/Function/Dropout.pyx":7
+  /* "ComputationalGraph/Function/Dropout.pyx":9
  * 
  * 
  * class Dropout(Function):             # <<<<<<<<<<<<<<
  *     """
  *     Implements the Dropout function.
 */
-  __pyx_t_7 = __Pyx_Py3ClassCreate(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_t_2, __pyx_t_6, NULL, 0, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_Py3ClassCreate(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_t_2, __pyx_t_6, NULL, 0, 0); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_7);
   #endif
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_t_7) < (0)) __PYX_ERR(0, 7, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_Dropout, __pyx_t_7) < (0)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "ComputationalGraph/Function/Dropout.pyx":1
- * import random             # <<<<<<<<<<<<<<
+ * # cython: language_level=3, boundscheck=False, wraparound=False             # <<<<<<<<<<<<<<
  * 
- * from .Function import Function
+ * import random
 */
   __pyx_t_2 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
@@ -4186,14 +4168,14 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "ComputationalGraph/Function/Dropout.pyx":12
+  /* "ComputationalGraph/Function/Dropout.pyx":14
  *     """
  * 
  *     def __init__(self, p: float, rng: random.Random | None = None):             # <<<<<<<<<<<<<<
  *         """
  *         Creates a Dropout function with the given dropout probability.
 */
-  __pyx_mstate_global->__pyx_tuple[0] = PyTuple_Pack(1, Py_None); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 12, __pyx_L1_error)
+  __pyx_mstate_global->__pyx_tuple[0] = PyTuple_Pack(1, Py_None); if (unlikely(!__pyx_mstate_global->__pyx_tuple[0])) __PYX_ERR(0, 14, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_mstate_global->__pyx_tuple[0]);
   __Pyx_GIVEREF(__pyx_mstate_global->__pyx_tuple[0]);
   #if CYTHON_IMMORTAL_CONSTANTS
@@ -4226,31 +4208,31 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 static int __Pyx_InitConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   {
-    const struct { const unsigned int length: 8; } index[] = {{1},{39},{36},{42},{1},{20},{35},{7},{16},{17},{18},{8},{11},{20},{6},{6},{6},{18},{8},{9},{5},{18},{4},{10},{7},{5},{8},{1},{8},{13},{5},{8},{4},{13},{10},{15},{10},{8},{9},{3},{1},{3},{11},{12},{1},{6},{6},{3},{4},{12},{10},{5},{8},{5},{6},{68},{130},{49}};
-    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (652 bytes) */
-const char* const cstring = "BZh91AY&SY^\3368%\000\0001\377\377\364\367\377\230\347\211\276\200\277\263~@\277\357\377\354\000@@@@@@@@@@@@\000@\000@\001\374klV\006\240\250\375Q\352x\247\352\217$\331OFI\247\251\2404\304\365\030G\250\304\304\003@\332\203\324<\231B&\224\330&$&\323\324i4\001\246\2320\200\000\310\032\003M\014LL\0048\0324b\r\032d\302\014@b14h\321\240\r4\320\000\000\001\221\004\323F\251\351\246SiF\324\332@\0004\030\201\240\000h\000~\250\364\237\241\")\270xM\344`o\343\322\014\347\241\305\306\3215g\030\326\027e\025\303Z9\3222\3040A\246-k\225B\344D\260\034\243c\341\205\367\376a\021U\271d\251\252\267\245\334\324\037qBH~\3205\223YM\262hP\231\223[m\303oLe\270\375\366>:\304\203\013\237\376-\330}i\0323(G\216-&_\217*3\221%S\242\371y\240\017\270\240\005\310Rk8\036\033\345\030?\216wb*\225\214a\020Y\241^u.@\003\220\030\350[\350\320\036.\230\3260\322X\177\260D\350\240\022\325dy\370\253E\021\244\213\215\207\203\365\035\3362\\^\203\251\224\345\"(RC\310\004d\205y\014\241G\224\322\001g\316\346\202\\\305\226i\"9\265\021>Q\2419\221\220\032\376\253e\254\005j2\320(\215\216z\246\300,\n,<p\222R\257\376O,\255c\202\213\024\020\261\024\314\032'x\201J\202\213\225\224\301\025\331\334\024\274\320\024\314\275]\016\001Z\326\003\262\020\255I\016\302\002\371\300|\306\244\010\320\025anH\251\274\243\310\027W\002q\214a\204\260QJI\250i\235\216%\266I\347o\035\334\304\020Z\177[\210\206a\032\304$\"s\323\210D\204\212\033j\226\207\341\034\311\003\300\320\023\010\264\204\337\230\2405\017\n\362\252\033:\347p\230\026\034\310\030\350\206\303R\231\206j\247\334\377\242\001\212\322r\024#\234\311\325+\00047\366\306\214\r*n&\361\213\203\016N\242\225\371\007op\357\027\340\036\002\021.\327\227\341\256B\270\376\036\271\205>[,rI\257\026a \272\257\270\215\203kE7\332\312\370\316\254sR~,\373\222j),\322\341\317Q\326\352\333\265\004\365\323\n\335\225\312Y\314\311\377A\314\017\247\376.\344\212p\241 \275\274pJ";
-    PyObject *data = __Pyx_DecompressString(cstring, 652, 2);
+    const struct { const unsigned int length: 8; } index[] = {{1},{39},{36},{42},{1},{20},{35},{7},{16},{17},{18},{8},{11},{20},{6},{6},{18},{8},{9},{18},{4},{10},{7},{5},{8},{1},{8},{13},{5},{8},{4},{13},{10},{15},{10},{1},{8},{3},{1},{3},{11},{12},{1},{6},{6},{3},{4},{12},{10},{5},{8},{5},{6},{85},{49},{157}};
+    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (638 bytes) */
+const char* const cstring = "BZh91AY&SY\264#\204\203\000\000<\377\373\346\367\376\320\367\211\266\300\277\363~\000\277\357\377\354\000@@@@@@@@@@\000@\000@\001\353T\222\300\321)\2246\246=S&\233MF\207\251\241\210\000\365\006M\000\304\0035\032h\362yS\362\240\321M4\321\251\350\031S\310\3214\001\240\000\000\000\000\000h\320\320\r4\202'\222#\324\310h\311\240\000\000\0004\000\000\000\320\310\034\r\006\231\r4ha\003!\241\20244\311\243@2\014@\000h\364\343\250.\024\222\tU1\006\024\262[\206\353\030f@\316yZ\2175\302\316\246CI\242\250\230\020\220\263~Q\014\257G#\200}($\240\301\254P\034\n\300\227\263\366\365\357l\001\023'debd\222\024\233\352\304y\210\232#\334\206\262\240\250c\000D\024Vj\315N\335{\220\243a\373\014\177\362V\002D\022`\274I\202C\235u\214$a.\354sH\375\r\204D\002\232\360\017}\274X-\017\235\3250\264\367\317\364\253/\331\234\210:J\305\032@\r!$3Z\r\023\271)\013w\003\023\342S<3/\331\242\266\374\267\320.\310L\016\260UY\242\233Lu\231/\240\311U&\322AN-9\260E\n\200\254\312\350S\253-\352\n\230,\252\246\276\345\247\354J\266B\034\"U\245\250\324\213\325\n\361\233\006$]8\230\305_\351Bk\366\261\301E5\010\026\002i\003E\007\211P\322\n\014d-mw\005\025R!RE\307\371p\n\326\260%J%Q\227F\206Q\t\000\034\364\220\203(\n\260\323I\227\251\032H\n\363\250\211\241\241\004H\022\261\221\200\305\251$NRJ\333nX\271\212\360\306\006\265\371\315\356O\314%\221S\226\rO\333\"\204:xi\202*\017\361B\010\330\r&\320\364dY\225`\0373\302\275\025C`\270\216\022\004ba\020\307D6\\\237\326\tE\211\341\215h\220//H\237#*s\323H\n\202\326\310uO\274\211\257\366\362\201\334\005\312\260\312W\205\354\270\0061v!~_BX]r\223\010H\036\001\203\010\217\\E\365\217\2319\004!?yFA4I\177p)\305\235\330hA\236\031:\010\033\006\303\312o\274}\237\255\353\320e\006\265\t\323\347\207z \350<\303\254`  \353\243\177\374]\311\024\341BB\320\216\022\014";
+    PyObject *data = __Pyx_DecompressString(cstring, 638, 2);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
-    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (551 bytes) */
-const char* const cstring = "x\332}Q\277O\0331\024\246U\244\002J!\024R\244v\350E\352\217\241\322!Z*\306\2126\024\265\022\210P\"u\263^\357^\310\t\237ml_\032\324\376\001\031=z\274\361\306\214\031\031\031o\314\330?\201?\241\276K\216\252B\252%?\277\037\237\277\367=\333\377\310c\221h\320\021g@\017$\210\376\326\247\204\005E\274\325\226\\\360D\373\342rx\027\346W\260[g\331s\353s,(\306\310\264\362t\037\2759\205\327\253\300%\350\275\004\026\362\330?)\017\357\227w\304\031\376\257\305\234\346\337\303'$b\221&\244\212\003\240ABAc\225\010QF\003\3078\300\212\351\020t\337?E\246\270$\344\370r\350v;\n49\302\241>\301\336L\320\254\016B \013A]\262 \342~\300\245c\214\030\252\357\020\234\377\000\031\336v\013(\202\014\250\2539=DK\010\260\300\204\240\341\257\000BB\036\020\322\243\034\234\342\3429\234\372j\000\022)r\333 \322\030+Bbpd\316\252sgQC@A\271\264\013x\230P,=\311\211{i\031a\201O\250\216\004\215\320\r\306 v\000NC2\000\232\240\343\025\202\013B\204D\001\262\274{\221\000\235\301\344\3543$\352D2\311\316\024\322\036!\n\365\234\306y!\366\300\321\253>\010\227\320\250\234\346\222\2714*\257y\271\367f\374z\322\271i,,5F\003\3231`\022\273g\277\245\335\254\225\355dr\2741\356NZ\223\267\223\360\352\305Ur\275w\3755?\356\344\235n\336%9\t\363\020\363\3323\3733k\335\254,,=\034\355\233\307\346b\272\3304\247v\335\266\323\373\351\363\024\246\213+#g\352\243C\333\2640\2557L\315\034\330\335\2645\255\257\216\244ydv\334\225\306\206\331\267\233\351\275tm\332X7\273\266e\337\271\340i\366!\203\337wk\333\323\305\325R,\026\260\274\366\304\276J\233)T\032\232n\210\213\242\343\027sfO\323\315ly\374r\362`R\244\362z+]\373\003\t\023G\263";
-    PyObject *data = __Pyx_DecompressString(cstring, 551, 1);
+    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (543 bytes) */
+const char* const cstring = "x\332}PMo\323@\020m\244 \322*\320\006\032\025q\301F|\034\220\\\201Z\301\r\025Z\nHT\264\224\363jjO\032\253k\257\263\273\016\211\340\007\344\270\307=\356\321\307\034\3633r\314\261?\241?\201q\276hU\tK;;\363\346\315\233\347\r>\212$\3135\350X\244\300\017%d\355\355Oy\032\226\365\366\276\024\231\310u\220\365{\267i\301\202\266L\326<\372\276$\031\307\004S\255<\335Fo.\341\265\026\344)\351\275\2044\022Ip2\275\274?\336\221H\361\177+\34627\257\200\2618\2155c\213:\004\036\346\0344.\200\010e\334%\305..\224\276\201n\007\247\230*!\031\373\336\357\321\331\217C\315\216\260\247O\260534\353\203\352\247a,\202PH\322\212STg\020^\374\002\031-\367\204\234`2\301\264\204\020\313v\004\032\376me,\022!c-.\200l\226o@\226\027\256Y\254\330R;\326\230(\306\022 1\212\352\202\"j\0109(\202\251\020Q\316q\232I\301\350ye\214%?\347:\316x\214\222\306RH\210AzY&2\3062\211\031\310\351L'\007>\353\312\331\313K\324\271Lez\256\220\267\030S\250\347\323\224E\330\002\222Um\310\010\320\250\310k\027x\216\323\240\306Uo\354\275\031\276\032\035_m\254\254zV9\337\355\270\316\244\366\310V\354\226\253\\\326\352\203\003\3234`:\223\372\372\240c\356\230\237\326\267\357\334nQ)6\213\223B\017wG\225QcR[\037t\315\261A\273\353*\343\352c\373\3225\035\\\335_Y\275\267\234'\251\257\346\334\236\272\255bm\370btwTB\343\272\357\032\343\352\023\373\273\360K\372\314\002\251Oj\276\333t?\212j\361\241\210\206\376\345uG\237\315\036\331xj\367&\327\355m\230\2529\264o\235_:\225\346\201\331!tc\323\034\330\206}n)}h^S\321\264`swP4\212g\305\331\260ry\233q\363o\376\002^QM\321";
+    PyObject *data = __Pyx_DecompressString(cstring, 543, 1);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
-    #else /* compression: none (828 bytes) */
-const char* const bytes = ".ComputationalGraph/Function/Dropout.pyxComputationalGraph.Function.Function\n    Implements the Dropout function.\n    ?random.Random | NoneComputationalGraph.Function.DropoutDropoutDropout.__init__Dropout.calculateDropout.derivativeFunctionMath.Tensor__Pyx_PyDict_NextRefRandomTensorappendasyncio.coroutinesbackwardcalculateclearcline_in_tracebackdataderivative__doc__float__func__i__init___is_coroutineitems__main__mask__metaclass____module____mro_entries__multiplier__name__old_valueoutppop__prepare____qualname__rrandomreturnrngself__set_name__setdefaultshape__test__valuevalues\320\004 \320 2\260+\270Q\360\020\000\t\020\210v\220Q\220a\220u\230A\230X\240U\250!\2504\250r\260\024\260U\270!\2703\270d\300%\300u\310A\310S\320PQ\320QU\320U_\320_d\320de\320\004\037\230{\250!\360\016\000\t\r\210E\220\026\220q\330\010\025\220T\230\023\230D\240\002\240$\240a\330\010\016\210a\330\010\014\210M\230\025\230a\330\014\020\220\004\220G\2307\240!\330\014\017\210r\220\022\2204\220q\330\020\024\220E\230\027\240\001\240\021\330\020\023\2207\230!\2305\240\001\240\033\250B\250a\340\020\024\220E\230\027\240\001\240\021\330\020\023\2207\230!\2301\330\010\017\210v\220Q\220e\2305\240\001\320\004\032\230'\240\025\240a\360\016\000\t\r\210E\220\025\220a\220q\330\010\014\210J\220g\230T\240\027\250\n\260&\270\007\270q\330\010\014\320\014!\240\021";
+    #else /* compression: none (853 bytes) */
+const char* const bytes = ".ComputationalGraph/Function/Dropout.pyxComputationalGraph.Function.Function\n    Implements the Dropout function.\n    ?random.Random | NoneComputationalGraph.Function.DropoutDropoutDropout.__init__Dropout.calculateDropout.derivativeFunctionMath.Tensor__Pyx_PyDict_NextRefRandomTensorasyncio.coroutinesbackwardcalculatecline_in_tracebackdataderivative__doc__float__func__i__init___is_coroutineitems__main__mask__metaclass____module____mro_entries__multipliern__name__outppop__prepare____qualname__rrandomreturnrngself__set_name__setdefaultshape__test__valuevalues\320\004 \320 2\260+\270Q\360\020\000\t \230s\240!\2404\240q\330\010\030\230\001\230\027\240\001\340\010\014\210E\220\025\220a\220q\330\014\017\210q\220\005\220U\230!\2308\2405\250\001\250\024\250R\250t\2605\270\001\270\021\330\010\017\210v\220Q\220e\2305\240\001\320\004\032\230'\240\025\240a\360\016\000\t\r\210E\220\025\220a\220q\330\010\014\210J\220g\230T\240\027\250\n\260&\270\007\270q\330\010\014\320\014!\240\021\320\004\037\230{\250!\360\016\000\t \230s\240!\2405\250\001\330\010!\240\024\240S\250\004\250B\250d\260!\340\010\030\230\001\230\027\240\001\340\010\014\210H\220A\220U\230\"\230A\330\010\014\210E\220\025\220a\220q\330\014\020\220\004\220G\2307\240!\330\014\017\210r\220\022\2204\220q\330\020\024\220E\230\021\230%\230q\330\020\023\2201\220E\230\025\230a\230u\240E\250\021\250$\250b\260\001\340\020\024\220E\230\021\230%\230q\330\020\023\2201\220E\230\021\330\010\017\210v\220Q\220e\2305\240\001";
     PyObject *data = NULL;
     CYTHON_UNUSED_VAR(__Pyx_DecompressString);
     #endif
     PyObject **stringtab = __pyx_mstate->__pyx_string_tab;
     Py_ssize_t pos = 0;
-    for (int i = 0; i < 55; i++) {
+    for (int i = 0; i < 53; i++) {
       Py_ssize_t bytes_length = index[i].length;
       PyObject *string = PyUnicode_DecodeUTF8(bytes + pos, bytes_length, NULL);
       if (likely(string) && i >= 6) PyUnicode_InternInPlace(&string);
@@ -4261,7 +4243,7 @@ const char* const bytes = ".ComputationalGraph/Function/Dropout.pyxComputational
       stringtab[i] = string;
       pos += bytes_length;
     }
-    for (int i = 55; i < 58; i++) {
+    for (int i = 53; i < 56; i++) {
       Py_ssize_t bytes_length = index[i].length;
       PyObject *string = PyBytes_FromStringAndSize(bytes + pos, bytes_length);
       stringtab[i] = string;
@@ -4272,14 +4254,14 @@ const char* const bytes = ".ComputationalGraph/Function/Dropout.pyxComputational
       }
     }
     Py_XDECREF(data);
-    for (Py_ssize_t i = 0; i < 58; i++) {
+    for (Py_ssize_t i = 0; i < 56; i++) {
       if (unlikely(PyObject_Hash(stringtab[i]) == -1)) {
         __PYX_ERR(0, 1, __pyx_L1_error)
       }
     }
     #if CYTHON_IMMORTAL_CONSTANTS
     {
-      PyObject **table = stringtab + 55;
+      PyObject **table = stringtab + 53;
       for (Py_ssize_t i=0; i<3; ++i) {
         #if CYTHON_COMPILING_IN_CPYTHON_FREETHREADING
         #if PY_VERSION_HEX < 0x030E0000
@@ -4352,19 +4334,19 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 12};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 3, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 14};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_p, __pyx_mstate->__pyx_n_u_rng};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_ComputationalGraph_Function_Drop_2, __pyx_mstate->__pyx_n_u_init, __pyx_mstate->__pyx_kp_b_iso88591_a_E_aq_JgT_q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 23};
-    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_value, __pyx_mstate->__pyx_n_u_multiplier, __pyx_mstate->__pyx_n_u_out, __pyx_mstate->__pyx_n_u_old_value, __pyx_mstate->__pyx_n_u_r};
-    __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_ComputationalGraph_Function_Drop_2, __pyx_mstate->__pyx_n_u_calculate, __pyx_mstate->__pyx_kp_b_iso88591_E_q_T_D_a_a_M_a_G7_r_4q_E_7_5_B, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 7, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 25};
+    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_value, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_multiplier, __pyx_mstate->__pyx_n_u_r, __pyx_mstate->__pyx_n_u_out};
+    __pyx_mstate_global->__pyx_codeobj_tab[1] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_ComputationalGraph_Function_Drop_2, __pyx_mstate->__pyx_n_u_calculate, __pyx_mstate->__pyx_kp_b_iso88591_s_5_S_Bd_HAU_A_E_aq_G7_r_4q_E_q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[1])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 4, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 43};
-    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_value, __pyx_mstate->__pyx_n_u_backward, __pyx_mstate->__pyx_n_u_i};
-    __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_ComputationalGraph_Function_Drop_2, __pyx_mstate->__pyx_n_u_derivative, __pyx_mstate->__pyx_kp_b_iso88591_2_Q_vQauAXU_4r_U_3d_uASPQQUU__d, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 6, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 48};
+    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_value, __pyx_mstate->__pyx_n_u_backward, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_n, __pyx_mstate->__pyx_n_u_out};
+    __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_ComputationalGraph_Function_Drop_2, __pyx_mstate->__pyx_n_u_derivative, __pyx_mstate->__pyx_kp_b_iso88591_2_Q_s_4q_E_aq_q_U_85_Rt5_vQe5, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   Py_DECREF(tuple_dedup_map);
   return 0;
@@ -5693,19 +5675,6 @@ static CYTHON_INLINE PyObject *__Pyx__GetModuleGlobalName(PyObject *name)
     return __Pyx_GetBuiltinName(name);
 }
 
-/* PyObjectFastCallMethod */
-#if !CYTHON_VECTORCALL || PY_VERSION_HEX < 0x03090000
-static PyObject *__Pyx_PyObject_FastCallMethod(PyObject *name, PyObject *const *args, size_t nargsf) {
-    PyObject *result;
-    PyObject *attr = PyObject_GetAttr(args[0], name);
-    if (unlikely(!attr))
-        return NULL;
-    result = __Pyx_PyObject_FastCall(attr, args+1, nargsf - 1);
-    Py_DECREF(attr);
-    return result;
-}
-#endif
-
 /* PyFloatBinop */
 #if !CYTHON_COMPILING_IN_PYPY
 static PyObject* __Pyx_PyFloat_TrueDivideCObj(PyObject *op1, PyObject *op2, double floatval, int inplace, int zerodivision_check) {
@@ -5851,145 +5820,83 @@ static PyObject* __Pyx_PyFloat_SubtractCObj(PyObject *op1, PyObject *op2, double
 }
 #endif
 
-/* PyObjectCall2Args (used by PyObjectCallMethod1) */
-static CYTHON_INLINE PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
-    PyObject *args[3] = {NULL, arg1, arg2};
-    return __Pyx_PyObject_FastCall(function, args+1, 2 | __Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET);
-}
-
-/* PyObjectGetMethod (used by PyObjectCallMethod1) */
-#if !(CYTHON_VECTORCALL && (__PYX_LIMITED_VERSION_HEX >= 0x030C0000 || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX >= 0x03090000)))
-static int __Pyx_PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
-    PyObject *attr;
-#if CYTHON_UNPACK_METHODS && CYTHON_COMPILING_IN_CPYTHON && CYTHON_USE_PYTYPE_LOOKUP
-    __Pyx_TypeName type_name;
-    PyTypeObject *tp = Py_TYPE(obj);
-    PyObject *descr;
-    descrgetfunc f = NULL;
-    PyObject **dictptr, *dict;
-    int meth_found = 0;
-    assert (*method == NULL);
-    if (unlikely(tp->tp_getattro != PyObject_GenericGetAttr)) {
-        attr = __Pyx_PyObject_GetAttrStr(obj, name);
-        goto try_unpack;
-    }
-    if (unlikely(tp->tp_dict == NULL) && unlikely(PyType_Ready(tp) < 0)) {
-        return 0;
-    }
-    descr = _PyType_Lookup(tp, name);
-    if (likely(descr != NULL)) {
-        Py_INCREF(descr);
-#if defined(Py_TPFLAGS_METHOD_DESCRIPTOR) && Py_TPFLAGS_METHOD_DESCRIPTOR
-        if (__Pyx_PyType_HasFeature(Py_TYPE(descr), Py_TPFLAGS_METHOD_DESCRIPTOR))
-#else
-        #ifdef __Pyx_CyFunction_USED
-        if (likely(PyFunction_Check(descr) || __Pyx_IS_TYPE(descr, &PyMethodDescr_Type) || __Pyx_CyFunction_Check(descr)))
-        #else
-        if (likely(PyFunction_Check(descr) || __Pyx_IS_TYPE(descr, &PyMethodDescr_Type)))
-        #endif
-#endif
-        {
-            meth_found = 1;
-        } else {
-            f = Py_TYPE(descr)->tp_descr_get;
-            if (f != NULL && PyDescr_IsData(descr)) {
-                attr = f(descr, obj, (PyObject *)Py_TYPE(obj));
-                Py_DECREF(descr);
-                goto try_unpack;
-            }
-        }
-    }
-    dictptr = _PyObject_GetDictPtr(obj);
-    if (dictptr != NULL && (dict = *dictptr) != NULL) {
-        Py_INCREF(dict);
-        attr = __Pyx_PyDict_GetItemStr(dict, name);
-        if (attr != NULL) {
-            Py_INCREF(attr);
-            Py_DECREF(dict);
-            Py_XDECREF(descr);
-            goto try_unpack;
-        }
-        Py_DECREF(dict);
-    }
-    if (meth_found) {
-        *method = descr;
-        return 1;
-    }
-    if (f != NULL) {
-        attr = f(descr, obj, (PyObject *)Py_TYPE(obj));
-        Py_DECREF(descr);
-        goto try_unpack;
-    }
-    if (likely(descr != NULL)) {
-        *method = descr;
-        return 0;
-    }
-    type_name = __Pyx_PyType_GetFullyQualifiedName(tp);
-    PyErr_Format(PyExc_AttributeError,
-                 "'" __Pyx_FMT_TYPENAME "' object has no attribute '%U'",
-                 type_name, name);
-    __Pyx_DECREF_TypeName(type_name);
-    return 0;
-#else
-    attr = __Pyx_PyObject_GetAttrStr(obj, name);
-    goto try_unpack;
-#endif
-try_unpack:
-#if CYTHON_UNPACK_METHODS
-    if (likely(attr) && PyMethod_Check(attr) && likely(PyMethod_GET_SELF(attr) == obj)) {
-        PyObject *function = PyMethod_GET_FUNCTION(attr);
-        Py_INCREF(function);
-        Py_DECREF(attr);
-        *method = function;
-        return 1;
-    }
-#endif
-    *method = attr;
-    return 0;
-}
-#endif
-
-/* PyObjectCallMethod1 (used by append) */
-#if !(CYTHON_VECTORCALL && (__PYX_LIMITED_VERSION_HEX >= 0x030C0000 || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX >= 0x03090000)))
-static PyObject* __Pyx__PyObject_CallMethod1(PyObject* method, PyObject* arg) {
-    PyObject *result = __Pyx_PyObject_CallOneArg(method, arg);
-    Py_DECREF(method);
+/* PyObjectFastCallMethod */
+#if !CYTHON_VECTORCALL || PY_VERSION_HEX < 0x03090000
+static PyObject *__Pyx_PyObject_FastCallMethod(PyObject *name, PyObject *const *args, size_t nargsf) {
+    PyObject *result;
+    PyObject *attr = PyObject_GetAttr(args[0], name);
+    if (unlikely(!attr))
+        return NULL;
+    result = __Pyx_PyObject_FastCall(attr, args+1, nargsf - 1);
+    Py_DECREF(attr);
     return result;
 }
 #endif
-static PyObject* __Pyx_PyObject_CallMethod1(PyObject* obj, PyObject* method_name, PyObject* arg) {
-#if CYTHON_VECTORCALL && (__PYX_LIMITED_VERSION_HEX >= 0x030C0000 || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX >= 0x03090000))
-    PyObject *args[2] = {obj, arg};
-    (void) __Pyx_PyObject_CallOneArg;
-    (void) __Pyx_PyObject_Call2Args;
-    return PyObject_VectorcallMethod(method_name, args, 2 | PY_VECTORCALL_ARGUMENTS_OFFSET, NULL);
-#else
-    PyObject *method = NULL, *result;
-    int is_method = __Pyx_PyObject_GetMethod(obj, method_name, &method);
-    if (likely(is_method)) {
-        result = __Pyx_PyObject_Call2Args(method, obj, arg);
-        Py_DECREF(method);
-        return result;
-    }
-    if (unlikely(!method)) return NULL;
-    return __Pyx__PyObject_CallMethod1(method, arg);
+
+/* SetItemInt */
+static int __Pyx_SetItemInt_Generic(PyObject *o, PyObject *j, PyObject *v) {
+    int r;
+    if (unlikely(!j)) return -1;
+    r = PyObject_SetItem(o, j, v);
+    Py_DECREF(j);
+    return r;
+}
+static CYTHON_INLINE int __Pyx_SetItemInt_Fast(PyObject *o, Py_ssize_t i, PyObject *v, int is_list,
+                                               int wraparound, int boundscheck, int unsafe_shared) {
+    CYTHON_MAYBE_UNUSED_VAR(unsafe_shared);
+#if CYTHON_ASSUME_SAFE_MACROS && CYTHON_ASSUME_SAFE_SIZE && !CYTHON_AVOID_BORROWED_REFS
+    if (is_list || PyList_CheckExact(o)) {
+        Py_ssize_t n = (!wraparound) ? i : ((likely(i >= 0)) ? i : i + PyList_GET_SIZE(o));
+        if ((CYTHON_AVOID_THREAD_UNSAFE_BORROWED_REFS && !__Pyx_IS_UNIQUELY_REFERENCED(o, unsafe_shared))) {
+            Py_INCREF(v);
+            return PyList_SetItem(o, n, v);
+        } else if ((!boundscheck) || likely(__Pyx_is_valid_index(n, PyList_GET_SIZE(o)))) {
+            PyObject* old;
+            Py_INCREF(v);
+            old = PyList_GET_ITEM(o, n);
+            PyList_SET_ITEM(o, n, v);
+            Py_DECREF(old);
+            return 0;
+        }
+    } else
 #endif
-}
-
-/* append */
-static CYTHON_INLINE int __Pyx_PyObject_Append(PyObject* L, PyObject* x) {
-    if (likely(PyList_CheckExact(L))) {
-        if (unlikely(__Pyx_PyList_Append(L, x) < 0)) return -1;
-    } else {
-        PyObject* retval = __Pyx_PyObject_CallMethod1(L, __pyx_mstate_global->__pyx_n_u_append, x);
-        if (unlikely(!retval))
-            return -1;
-        Py_DECREF(retval);
+#if CYTHON_USE_TYPE_SLOTS && !CYTHON_COMPILING_IN_PYPY
+    {
+        PyMappingMethods *mm = Py_TYPE(o)->tp_as_mapping;
+        PySequenceMethods *sm = Py_TYPE(o)->tp_as_sequence;
+        if (!is_list && mm && mm->mp_ass_subscript) {
+            int r;
+            PyObject *key = PyLong_FromSsize_t(i);
+            if (unlikely(!key)) return -1;
+            r = mm->mp_ass_subscript(o, key, v);
+            Py_DECREF(key);
+            return r;
+        }
+        if (is_list || likely(sm && sm->sq_ass_item)) {
+            if (wraparound && unlikely(i < 0) && likely(sm->sq_length)) {
+                Py_ssize_t l = sm->sq_length(o);
+                if (likely(l >= 0)) {
+                    i += l;
+                } else {
+                    if (!PyErr_ExceptionMatches(PyExc_OverflowError))
+                        return -1;
+                    PyErr_Clear();
+                }
+            }
+            return sm->sq_ass_item(o, i, v);
+        }
     }
-    return 0;
+#else
+    if (is_list || !PyMapping_Check(o)) {
+        return PySequence_SetItem(o, i, v);
+    }
+#endif
+    (void)wraparound;
+    (void)boundscheck;
+    return __Pyx_SetItemInt_Generic(o, PyLong_FromSsize_t(i), v);
 }
 
-/* pybytes_as_double (used by pynumber_float) */
+/* pybytes_as_double (used by pyobject_as_double) */
 static double __Pyx_SlowPyString_AsDouble(PyObject *obj) {
     PyObject *float_value = PyFloat_FromString(obj);
     if (likely(float_value)) {
@@ -6099,33 +6006,44 @@ fallback:
     return __Pyx_SlowPyString_AsDouble(obj);
 }
 
-/* pynumber_float */
-static CYTHON_INLINE PyObject* __Pyx__PyNumber_Float(PyObject* obj) {
-    double val;
-    if (PyLong_CheckExact(obj)) {
-#if CYTHON_USE_PYLONG_INTERNALS
-        if (likely(__Pyx_PyLong_IsCompact(obj))) {
-            val = (double) __Pyx_PyLong_CompactValue(obj);
-            goto no_error;
+/* pyobject_as_double */
+static double __Pyx__PyObject_AsDouble(PyObject* obj) {
+    if (PyUnicode_CheckExact(obj)) {
+        return __Pyx_PyUnicode_AsDouble(obj);
+    } else if (PyBytes_CheckExact(obj)) {
+        return __Pyx_PyBytes_AsDouble(obj);
+    } else if (PyByteArray_CheckExact(obj)) {
+        return __Pyx_PyByteArray_AsDouble(obj);
+    } else {
+        PyObject* float_value;
+#if !CYTHON_USE_TYPE_SLOTS
+        float_value = PyNumber_Float(obj);  if ((0)) goto bad;
+        (void)__Pyx_PyObject_CallOneArg;
+#else
+        PyNumberMethods *nb = Py_TYPE(obj)->tp_as_number;
+        if (likely(nb) && likely(nb->nb_float)) {
+            float_value = nb->nb_float(obj);
+            if (likely(float_value) && unlikely(!PyFloat_Check(float_value))) {
+                __Pyx_TypeName float_value_type_name = __Pyx_PyType_GetFullyQualifiedName(Py_TYPE(float_value));
+                PyErr_Format(PyExc_TypeError,
+                    "__float__ returned non-float (type " __Pyx_FMT_TYPENAME ")",
+                    float_value_type_name);
+                __Pyx_DECREF_TypeName(float_value_type_name);
+                Py_DECREF(float_value);
+                goto bad;
+            }
+        } else {
+            float_value = __Pyx_PyObject_CallOneArg((PyObject*)&PyFloat_Type, obj);
         }
 #endif
-        val = PyLong_AsDouble(obj);
-    } else if (PyUnicode_CheckExact(obj)) {
-        val = __Pyx_PyUnicode_AsDouble(obj);
-    } else if (PyBytes_CheckExact(obj)) {
-        val = __Pyx_PyBytes_AsDouble(obj);
-    } else if (PyByteArray_CheckExact(obj)) {
-        val = __Pyx_PyByteArray_AsDouble(obj);
-    } else {
-        return PyNumber_Float(obj);
+        if (likely(float_value)) {
+            double value = __Pyx_PyFloat_AS_DOUBLE(float_value);
+            Py_DECREF(float_value);
+            return value;
+        }
     }
-    if (unlikely(val == -1 && PyErr_Occurred())) {
-        return NULL;
-    }
-#if CYTHON_USE_PYLONG_INTERNALS
-no_error:
-#endif
-    return PyFloat_FromDouble(val);
+bad:
+    return (double)-1;
 }
 
 /* GetItemInt */
@@ -6229,6 +6147,35 @@ static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i, 
     (void)wraparound;
     (void)boundscheck;
     return __Pyx_GetItemInt_Generic(o, PyLong_FromSsize_t(i));
+}
+
+/* pynumber_float */
+static CYTHON_INLINE PyObject* __Pyx__PyNumber_Float(PyObject* obj) {
+    double val;
+    if (PyLong_CheckExact(obj)) {
+#if CYTHON_USE_PYLONG_INTERNALS
+        if (likely(__Pyx_PyLong_IsCompact(obj))) {
+            val = (double) __Pyx_PyLong_CompactValue(obj);
+            goto no_error;
+        }
+#endif
+        val = PyLong_AsDouble(obj);
+    } else if (PyUnicode_CheckExact(obj)) {
+        val = __Pyx_PyUnicode_AsDouble(obj);
+    } else if (PyBytes_CheckExact(obj)) {
+        val = __Pyx_PyBytes_AsDouble(obj);
+    } else if (PyByteArray_CheckExact(obj)) {
+        val = __Pyx_PyByteArray_AsDouble(obj);
+    } else {
+        return PyNumber_Float(obj);
+    }
+    if (unlikely(val == -1 && PyErr_Occurred())) {
+        return NULL;
+    }
+#if CYTHON_USE_PYLONG_INTERNALS
+no_error:
+#endif
+    return PyFloat_FromDouble(val);
 }
 
 /* HasAttr (used by ImportImpl) */
@@ -8090,6 +8037,12 @@ static PyObject *__Pyx_CyFunction_New(PyMethodDef *ml, int flags, PyObject* qual
         PyObject_GC_Track(op);
     }
     return op;
+}
+
+/* PyObjectCall2Args (used by Py3ClassCreate) */
+static CYTHON_INLINE PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
+    PyObject *args[3] = {NULL, arg1, arg2};
+    return __Pyx_PyObject_FastCall(function, args+1, 2 | __Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET);
 }
 
 /* PyObjectLookupSpecial (used by Py3ClassCreate) */

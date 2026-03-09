@@ -1,3 +1,5 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
+
 import random
 
 from .Function import Function
@@ -27,17 +29,20 @@ class Dropout(Function):
         @param value The tensor whose values are to be transformed.
         @return Output tensor after dropout masking and scaling.
         """
-        self.mask.clear()
-        multiplier = 1.0 / (1.0 - self.p)
-        out = []
-        for old_value in value.data:
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double multiplier = 1.0 / (1.0 - self.p)
+        cdef double r
+        cdef list out = [0.0] * n
+
+        self.mask = [0.0] * n
+        for i in range(n):
             r = self.random.random()
             if r > self.p:
-                self.mask.append(multiplier)
-                out.append(float(old_value) * multiplier)
+                self.mask[i] = multiplier
+                out[i] = float(value.data[i]) * multiplier
             else:
-                self.mask.append(0.0)
-                out.append(0.0)
+                self.mask[i] = 0.0
+                out[i] = 0.0
         return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
@@ -48,4 +53,9 @@ class Dropout(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        return Tensor([float(backward.data[i]) * self.mask[i] for i in range(len(self.mask))], value.shape)
+        cdef Py_ssize_t i, n = len(self.mask)
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            out[i] = float(backward.data[i]) * self.mask[i]
+        return Tensor(out, value.shape)

@@ -1,4 +1,6 @@
-import math
+# cython: language_level=3, boundscheck=False, wraparound=False
+
+from libc.math cimport exp
 
 from .Function import Function
 from Math.Tensor import Tensor
@@ -28,13 +30,19 @@ class DELU(Function):
         @param value The tensor whose values are to be transformed.
         @return DELU(x).
         """
-        out = []
-        for v in value.data:
-            x = float(v)
-            if x > self.xc:
-                out.append(x)
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double x
+        cdef double a = self.a
+        cdef double b = self.b
+        cdef double xc = self.xc
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            x = float(value.data[i])
+            if x > xc:
+                out[i] = x
             else:
-                out.append((math.exp(self.a * x) - 1.0) / self.b)
+                out[i] = (exp(a * x) - 1.0) / b
         return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
@@ -45,12 +53,18 @@ class DELU(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        out = []
-        for i, v in enumerate(value.data):
-            x = float(v)
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double x, bwd
+        cdef double a = self.a
+        cdef double b = self.b
+        cdef double xc = self.xc
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            x = float(value.data[i])
             bwd = float(backward.data[i])
-            if x > self.xc:
-                out.append(bwd)
+            if x > xc:
+                out[i] = bwd
             else:
-                out.append(bwd * ((x * self.b + 1.0) * (self.a / self.b)))
+                out[i] = bwd * ((x * b + 1.0) * (a / b))
         return Tensor(out, value.shape)

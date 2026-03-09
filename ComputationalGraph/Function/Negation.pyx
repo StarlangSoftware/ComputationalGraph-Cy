@@ -1,3 +1,5 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
+
 from .Function import Function
 from Math.Tensor import Tensor
 
@@ -14,7 +16,12 @@ class Negation(Function):
         @param value The tensor whose values are to be negated.
         @return The negated tensor.
         """
-        return Tensor([-float(v) for v in value.data], value.shape)
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            out[i] = -float(value.data[i])
+        return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
         """
@@ -24,4 +31,9 @@ class Negation(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        return Tensor([-float(v) for v in backward.data], value.shape)
+        cdef Py_ssize_t i, n = len(backward.data)
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            out[i] = -float(backward.data[i])
+        return Tensor(out, value.shape)

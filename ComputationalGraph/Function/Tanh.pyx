@@ -1,4 +1,6 @@
-import math
+# cython: language_level=3, boundscheck=False, wraparound=False
+
+from libc.math cimport tanh
 
 from .Function import Function
 from Math.Tensor import Tensor
@@ -16,7 +18,13 @@ class Tanh(Function):
         @param value The tensor whose values are to be transformed.
         @return Tanh(x).
         """
-        out = [math.tanh(float(v)) for v in value.data]
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double x
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            x = float(value.data[i])
+            out[i] = tanh(x)
         return Tensor(out, value.shape)
 
     def derivative(self, value: Tensor, backward: Tensor) -> Tensor:
@@ -27,7 +35,11 @@ class Tanh(Function):
         @param backward Backward tensor.
         @return Gradient value of the corresponding node.
         """
-        out = []
-        for i, val in enumerate(value.data):
-            out.append((1.0 - float(val) * float(val)) * float(backward.data[i]))
+        cdef Py_ssize_t i, n = len(value.data)
+        cdef double val
+        cdef list out = [0.0] * n
+
+        for i in range(n):
+            val = float(value.data[i])
+            out[i] = (1.0 - val * val) * float(backward.data[i])
         return Tensor(out, value.shape)
